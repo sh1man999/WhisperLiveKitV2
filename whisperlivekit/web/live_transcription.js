@@ -175,10 +175,17 @@ function fmt1(x) {
   return Number.isFinite(n) ? n.toFixed(1) : x;
 }
 
-// Default WebSocket URL computation
-const host = window.location.hostname || "localhost";
-const port = window.location.port;
-const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+let host, port, protocol;
+
+if (isExtension) {
+    host = "localhost";
+    port = 8000;
+    protocol = "ws";
+} else {
+    host = window.location.hostname || "localhost";
+    port = window.location.port || 8000;
+    protocol = window.location.protocol === "https:" ? "wss" : "ws";
+}
 const defaultWebSocketUrl = `${protocol}://${host}${port ? ":" + port : ""}/asr`;
 
 // Populate default caption and input
