@@ -50,7 +50,7 @@ Homepage = "https://github.com/QuentinFuxa/WhisperLiveKit"
 whisperlivekit-server = "whisperlivekit.basic_server:main"
 
 [tool.setuptools]
-packages = ["whisperlivekit", "whisperlivekit.diarization", "whisperlivekit.simul_whisper", "whisperlivekit.simul_whisper.whisper", "whisperlivekit.simul_whisper.whisper.assets", "whisperlivekit.simul_whisper.whisper.normalizers", "whisperlivekit.web", "whisperlivekit.whisper_streaming_custom"]
+packages = ["whisperlivekit", "whisperlivekit.diarization", "whisperlivekit.simul_whisper", "whisperlivekit.simul_whisper.whisper", "whisperlivekit.simul_whisper.whisper.assets", "whisperlivekit.simul_whisper.whisper.normalizers", "whisperlivekit.web", "whisperlivekit.whisper_streaming_custom", "whisperlivekit.translation"]
 
 [tool.setuptools.package-data]
 whisperlivekit = ["web/*.html", "web/*.css", "web/*.js", "web/src/*.svg"]
