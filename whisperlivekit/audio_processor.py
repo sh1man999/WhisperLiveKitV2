@@ -9,7 +9,7 @@ from whisperlivekit.core import TranscriptionEngine, online_factory, online_diar
 from whisperlivekit.silero_vad_iterator import FixedVADIterator
 from whisperlivekit.results_formater import format_output
 from whisperlivekit.ffmpeg_manager import FFmpegManager, FFmpegState
-# Set up logging once
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -100,17 +100,21 @@ class AudioProcessor:
 
         self.transcription_task = None
         self.diarization_task = None
+        self.translation_task = None
         self.watchdog_task = None
         self.all_tasks_for_cleanup = []
-        self.online_translation = None
         
+        self.transcription = None
+        self.translation = None
+        self.diarization = None
+
         if self.args.transcription:
-            self.online = online_factory(self.args, models.asr, models.tokenizer)        
-            self.sep = self.online.asr.sep   
+            self.transcription = online_factory(self.args, models.asr, models.tokenizer)        
+            self.sep = self.transcription.asr.sep   
         if self.args.diarization:
             self.diarization = online_diarization_factory(self.args, models.diarization_model)
         if models.translation_model:
-            self.online_translation = online_translation_factory(self.args, models.translation_model)
+            self.translation = online_translation_factory(self.args, models.translation_model)
 
     def convert_pcm_to_float(self, pcm_buffer):
         """Convert PCM buffer in s16le format to normalized NumPy array."""
@@ -204,9 +208,9 @@ class AudioProcessor:
         logger.info("FFmpeg stdout processing finished. Signaling downstream processors if needed.")
         if not self.diarization_before_transcription and self.transcription_queue:
             await self.transcription_queue.put(SENTINEL)
-        if self.args.diarization and self.diarization_queue:
+        if self.diarization:
             await self.diarization_queue.put(SENTINEL)
-        if self.online_translation:
+        if self.translation:
             await self.translation_queue.put(SENTINEL)
 
     async def transcription_processor(self):
@@ -221,7 +225,7 @@ class AudioProcessor:
                     self.transcription_queue.task_done()
                     break
 
-                asr_internal_buffer_duration_s = len(getattr(self.online, 'audio_buffer', [])) / self.online.SAMPLING_RATE
+                asr_internal_buffer_duration_s = len(getattr(self.transcription, 'audio_buffer', [])) / self.transcription.SAMPLING_RATE
                 transcription_lag_s = max(0.0, time() - self.beg_loop - self.end_buffer)
                 asr_processing_logs = f"internal_buffer={asr_internal_buffer_duration_s:.2f}s | lag={transcription_lag_s:.2f}s |"
                 if type(item) is Silence:
@@ -230,10 +234,10 @@ class AudioProcessor:
                         asr_processing_logs += f" | last_end = {self.tokens[-1].end} |"
                     logger.info(asr_processing_logs)
                     cumulative_pcm_duration_stream_time += item.duration
-                    self.online.insert_silence(item.duration, self.tokens[-1].end if self.tokens else 0)
+                    self.transcription.insert_silence(item.duration, self.tokens[-1].end if self.tokens else 0)
                     continue
                 elif isinstance(item, ChangeSpeaker):
-                    self.online.new_speaker(item)
+                    self.transcription.new_speaker(item)
                 elif isinstance(item, np.ndarray):
                     pcm_array = item
                 
@@ -243,10 +247,10 @@ class AudioProcessor:
                 cumulative_pcm_duration_stream_time += duration_this_chunk
                 stream_time_end_of_current_pcm = cumulative_pcm_duration_stream_time
 
-                self.online.insert_audio_chunk(pcm_array, stream_time_end_of_current_pcm)
-                new_tokens, current_audio_processed_upto = await asyncio.to_thread(self.online.process_iter)
+                self.transcription.insert_audio_chunk(pcm_array, stream_time_end_of_current_pcm)
+                new_tokens, current_audio_processed_upto = await asyncio.to_thread(self.transcription.process_iter)
                 
-                _buffer_transcript = self.online.get_buffer()
+                _buffer_transcript = self.transcription.get_buffer()
                 buffer_text = _buffer_transcript.text
 
                 if new_tokens:
@@ -352,7 +356,7 @@ class AudioProcessor:
                     self.translation_queue.task_done()
                     break
                 elif type(item) is Silence:
-                    self.online_translation.insert_silence(item.duration)
+                    self.translation.insert_silence(item.duration)
                     continue
                 
                 # get all the available tokens for translation. The more words, the more precise
@@ -366,8 +370,8 @@ class AudioProcessor:
                         break
                     tokens_to_process.append(additional_token)                
                 if tokens_to_process:
-                    self.online_translation.insert_tokens(tokens_to_process)
-                    self.translated_segments = await asyncio.to_thread(self.online_translation.process)
+                    self.translation.insert_tokens(tokens_to_process)
+                    self.translated_segments = await asyncio.to_thread(self.translation.process)
                 self.translation_queue.task_done()
                 for _ in additional_tokens:
                     self.translation_queue.task_done()
@@ -494,17 +498,17 @@ class AudioProcessor:
             self.all_tasks_for_cleanup.append(self.ffmpeg_reader_task)
             processing_tasks_for_watchdog.append(self.ffmpeg_reader_task)
 
-        if self.args.transcription and self.online:
+        if self.transcription:
             self.transcription_task = asyncio.create_task(self.transcription_processor())
             self.all_tasks_for_cleanup.append(self.transcription_task)
             processing_tasks_for_watchdog.append(self.transcription_task)
             
-        if self.args.diarization and self.diarization:
+        if self.diarization:
             self.diarization_task = asyncio.create_task(self.diarization_processor(self.diarization))
             self.all_tasks_for_cleanup.append(self.diarization_task)
             processing_tasks_for_watchdog.append(self.diarization_task)
         
-        if self.online_translation:
+        if self.translation:
             self.translation_task = asyncio.create_task(self.translation_processor())
             self.all_tasks_for_cleanup.append(self.translation_task)
             processing_tasks_for_watchdog.append(self.translation_task)
@@ -555,7 +559,7 @@ class AudioProcessor:
                 logger.info("FFmpeg manager stopped.")
             except Exception as e:
                 logger.warning(f"Error stopping FFmpeg manager: {e}")
-        if self.args.diarization and hasattr(self, 'dianization') and hasattr(self.diarization, 'close'):
+        if self.diarization:
             self.diarization.close()
         logger.info("AudioProcessor cleanup complete.")
 
