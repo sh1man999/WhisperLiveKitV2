@@ -616,9 +616,13 @@ class AudioProcessor:
                 f"Consider using a smaller model."
             )
 
-        # Process audio chunk
-        pcm_array = self.convert_pcm_to_float(self.pcm_buffer[:self.max_bytes_per_sec])
-        self.pcm_buffer = self.pcm_buffer[self.max_bytes_per_sec:]
+        chunk_size = min(len(self.pcm_buffer), self.max_bytes_per_sec)
+        aligned_chunk_size = (chunk_size // self.bytes_per_sample) * self.bytes_per_sample
+        
+        if aligned_chunk_size == 0:
+            return
+        pcm_array = self.convert_pcm_to_float(self.pcm_buffer[:aligned_chunk_size])
+        self.pcm_buffer = self.pcm_buffer[aligned_chunk_size:]
 
         res = None
         end_of_audio = False
