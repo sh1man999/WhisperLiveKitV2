@@ -140,6 +140,7 @@ async def websocket_endpoint(websocket: WebSocket):
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `--model` | Whisper model size. List and recommandations [here](https://github.com/QuentinFuxa/WhisperLiveKit/blob/main/available_models.md) | `small` |
+| `--model-dir` | Directory containing Whisper model.bin and other files. Overrides `--model`. | `None` |
 | `--language` | List [here](https://github.com/QuentinFuxa/WhisperLiveKit/blob/main/whisperlivekit/simul_whisper/whisper/tokenizer.py). If you use `auto`, the model attempts to detect the language automatically, but it tends to bias towards English. | `auto` |
 | `--target-language` | If sets, activates translation using NLLB. Ex: `fr`. [118 languages available](https://github.com/QuentinFuxa/WhisperLiveKit/blob/main/whisperlivekit/translation/mapping_languages.py). If you want to translate to english, you should rather use `--task translate`, since Whisper can do it directly. | `None` |
 | `--task` | Set to `translate` to translate *only* to english, using Whisper translation. | `transcribe` |
@@ -169,6 +170,7 @@ async def websocket_endpoint(websocket: WebSocket):
 | SimulStreaming backend options | Description | Default |
 |-----------|-------------|---------|
 | `--disable-fast-encoder` | Disable Faster Whisper or MLX Whisper backends for the encoder (if installed). Inference can be slower but helpful when GPU memory is limited | `False` |
+| `--custom-alignment-heads` | Use your own alignment heads, useful when `--model-dir` is used | `None` |
 | `--frame-threshold` | AlignAtt frame threshold (lower = faster, higher = more accurate) | `25` |
 | `--beams` | Number of beams for beam search (1 = greedy decoding) | `1` |
 | `--decoder` | Force decoder type (`beam` or `greedy`) | `auto` |

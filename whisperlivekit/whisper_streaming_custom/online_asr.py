@@ -106,9 +106,6 @@ class OnlineASRProcessor:
     def __init__(
         self,
         asr,
-        tokenize_method: Optional[callable] = None,
-        buffer_trimming: Tuple[str, float] = ("segment", 15),
-        confidence_validation = False,
         logfile=sys.stderr,
     ):
         """
@@ -119,13 +116,14 @@ class OnlineASRProcessor:
         buffer_trimming: A tuple (option, seconds), where option is either "sentence" or "segment".
         """
         self.asr = asr
-        self.tokenize = tokenize_method
+        self.tokenize = asr.tokenizer
         self.logfile = logfile
-        self.confidence_validation = confidence_validation
+        self.confidence_validation = asr.confidence_validation
         self.global_time_offset = 0.0
         self.init()
 
-        self.buffer_trimming_way, self.buffer_trimming_sec = buffer_trimming
+        self.buffer_trimming_way = asr.buffer_trimming
+        self.buffer_trimming_sec = asr.buffer_trimming_sec
 
         if self.buffer_trimming_way not in ["sentence", "segment"]:
             raise ValueError("buffer_trimming must be either 'sentence' or 'segment'")

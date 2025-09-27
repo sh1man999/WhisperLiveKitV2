@@ -11,14 +11,14 @@ class ASRBase:
     sep = " "  # join transcribe words with this character (" " for whisper_timestamped,
               # "" for faster-whisper because it emits the spaces when needed)
 
-    def __init__(self, lan, modelsize=None, cache_dir=None, model_dir=None, logfile=sys.stderr):
+    def __init__(self, lan, model_size=None, cache_dir=None, model_dir=None, logfile=sys.stderr):
         self.logfile = logfile
         self.transcribe_kargs = {}
         if lan == "auto":
             self.original_language = None
         else:
             self.original_language = lan
-        self.model = self.load_model(modelsize, cache_dir, model_dir)
+        self.model = self.load_model(model_size, cache_dir, model_dir)
 
     def with_offset(self, offset: float) -> ASRToken:
         # This method is kept for compatibility (typically you will use ASRToken.with_offset)
@@ -27,7 +27,7 @@ class ASRBase:
     def __repr__(self):
         return f"ASRToken(start={self.start:.2f}, end={self.end:.2f}, text={self.text!r})"
 
-    def load_model(self, modelsize, cache_dir, model_dir):
+    def load_model(self, model_size, cache_dir, model_dir):
         raise NotImplementedError("must be implemented in the child class")
 
     def transcribe(self, audio, init_prompt=""):
@@ -41,7 +41,7 @@ class WhisperTimestampedASR(ASRBase):
     """Uses whisper_timestamped as the backend."""
     sep = " "
 
-    def load_model(self, modelsize=None, cache_dir=None, model_dir=None):
+    def load_model(self, model_size=None, cache_dir=None, model_dir=None):
         import whisper
         import whisper_timestamped
         from whisper_timestamped import transcribe_timestamped
@@ -49,7 +49,7 @@ class WhisperTimestampedASR(ASRBase):
         self.transcribe_timestamped = transcribe_timestamped
         if model_dir is not None:
             logger.debug("ignoring model_dir, not implemented")
-        return whisper.load_model(modelsize, download_root=cache_dir)
+        return whisper.load_model(model_size, download_root=cache_dir)
 
     def transcribe(self, audio, init_prompt=""):
         result = self.transcribe_timestamped(
@@ -88,17 +88,17 @@ class FasterWhisperASR(ASRBase):
     """Uses faster-whisper as the backend."""
     sep = ""
 
-    def load_model(self, modelsize=None, cache_dir=None, model_dir=None):
+    def load_model(self, model_size=None, cache_dir=None, model_dir=None):
         from faster_whisper import WhisperModel
 
         if model_dir is not None:
             logger.debug(f"Loading whisper model from model_dir {model_dir}. "
-                         f"modelsize and cache_dir parameters are not used.")
+                         f"model_size and cache_dir parameters are not used.")
             model_size_or_path = model_dir
-        elif modelsize is not None:
-            model_size_or_path = modelsize
+        elif model_size is not None:
+            model_size_or_path = model_size
         else:
-            raise ValueError("Either modelsize or model_dir must be set")
+            raise ValueError("Either model_size or model_dir must be set")
         device = "auto" # Allow CTranslate2 to decide available device
         compute_type = "auto" # Allow CTranslate2 to decide faster compute type
                               
@@ -149,18 +149,18 @@ class MLXWhisper(ASRBase):
     """
     sep = ""
 
-    def load_model(self, modelsize=None, cache_dir=None, model_dir=None):
+    def load_model(self, model_size=None, cache_dir=None, model_dir=None):
         from mlx_whisper.transcribe import ModelHolder, transcribe
         import mlx.core as mx
 
         if model_dir is not None:
-            logger.debug(f"Loading whisper model from model_dir {model_dir}. modelsize parameter is not used.")
+            logger.debug(f"Loading whisper model from model_dir {model_dir}. model_size parameter is not used.")
             model_size_or_path = model_dir
-        elif modelsize is not None:
-            model_size_or_path = self.translate_model_name(modelsize)
-            logger.debug(f"Loading whisper model {modelsize}. You use mlx whisper, so {model_size_or_path} will be used.")
+        elif model_size is not None:
+            model_size_or_path = self.translate_model_name(model_size)
+            logger.debug(f"Loading whisper model {model_size}. You use mlx whisper, so {model_size_or_path} will be used.")
         else:
-            raise ValueError("Either modelsize or model_dir must be set")
+            raise ValueError("Either model_size or model_dir must be set")
 
         self.model_size_or_path = model_size_or_path
         dtype = mx.float16

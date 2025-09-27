@@ -89,6 +89,7 @@ def parse_args():
         "--model",
         type=str,
         default="small",
+        dest='model_size',
         help="Name size of the Whisper model to use (default: tiny). Suggested values: tiny.en,tiny,base.en,base,small.en,small,medium.en,medium,large-v1,large-v2,large-v3,large,large-v3-turbo. The model is automatically downloaded from the model hub if not present in model cache dir.",
     )
     
@@ -109,6 +110,7 @@ def parse_args():
         "--language",
         type=str,
         default="auto",
+        dest='lan',
         help="Source language code, e.g. en,de,cs, or 'auto' for language detection.",
     )
     parser.add_argument(
@@ -188,6 +190,13 @@ def parse_args():
         default=False,
         dest="disable_fast_encoder",
         help="Disable Faster Whisper or MLX Whisper backends for encoding (if installed). Slower but helpful when GPU memory is limited",
+    )
+
+    simulstreaming_group.add_argument(
+        "--custom-alignment-heads",
+        type=str,
+        default=None,
+        help="Use your own alignment heads, useful when `--model-dir` is used",
     )
     
     simulstreaming_group.add_argument(

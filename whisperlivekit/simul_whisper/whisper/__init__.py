@@ -105,7 +105,8 @@ def load_model(
     device: Optional[Union[str, torch.device]] = None,
     download_root: str = None,
     in_memory: bool = False,
-    decoder_only=False
+    decoder_only=False,
+    custom_alignment_heads=None
 ) -> Whisper:
     """
     Load a Whisper ASR model
@@ -135,15 +136,17 @@ def load_model(
         download_root = os.path.join(os.getenv("XDG_CACHE_HOME", default), "whisper")
 
     if name in _MODELS:
-        checkpoint_file = _download(_MODELS[name], download_root, in_memory)
-        alignment_heads = _ALIGNMENT_HEADS[name]
+        checkpoint_file = _download(_MODELS[name], download_root, in_memory)        
     elif os.path.isfile(name):
         checkpoint_file = open(name, "rb").read() if in_memory else name
-        alignment_heads = None
     else:
         raise RuntimeError(
             f"Model {name} not found; available models = {available_models()}"
         )
+        
+    alignment_heads = _ALIGNMENT_HEADS.get(name, None)
+    if custom_alignment_heads:
+        alignment_heads = custom_alignment_heads.encode()
 
     with (
         io.BytesIO(checkpoint_file) if in_memory else open(checkpoint_file, "rb")

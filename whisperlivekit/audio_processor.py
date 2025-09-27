@@ -72,7 +72,6 @@ class AudioProcessor:
 
         # Models and processing
         self.asr = models.asr
-        self.tokenizer = models.tokenizer
         self.vac_model = models.vac_model
         if self.args.vac:
             self.vac = FixedVADIterator(models.vac_model)
@@ -109,7 +108,7 @@ class AudioProcessor:
         self.diarization = None
 
         if self.args.transcription:
-            self.transcription = online_factory(self.args, models.asr, models.tokenizer)        
+            self.transcription = online_factory(self.args, models.asr)        
             self.sep = self.transcription.asr.sep   
         if self.args.diarization:
             self.diarization = online_diarization_factory(self.args, models.diarization_model)

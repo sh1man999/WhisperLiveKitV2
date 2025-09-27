@@ -21,27 +21,27 @@ class TranslationModel():
     device: str
     tokenizer: dict = field(default_factory=dict)
     backend_type: str = 'ctranslate2'
-    model_size: str = '600M'
+    nllb_size: str = '600M'
     
     def get_tokenizer(self, input_lang):
         if not self.tokenizer.get(input_lang, False):
             self.tokenizer[input_lang] = transformers.AutoTokenizer.from_pretrained(
-                f"facebook/nllb-200-distilled-{self.model_size}",
+                f"facebook/nllb-200-distilled-{self.nllb_size}",
                 src_lang=input_lang,
                 clean_up_tokenization_spaces=True
             )
         return self.tokenizer[input_lang]
             
 
-def load_model(src_langs, backend='ctranslate2', model_size='600M'):
+def load_model(src_langs, nllb_backend='ctranslate2', nllb_size='600M'):
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    MODEL = f'nllb-200-distilled-{model_size}-ctranslate2'
-    if backend=='ctranslate2':
+    MODEL = f'nllb-200-distilled-{nllb_size}-ctranslate2'
+    if nllb_backend=='ctranslate2':
         MODEL_GUY = 'entai2965'
         huggingface_hub.snapshot_download(MODEL_GUY + '/' + MODEL,local_dir=MODEL)
         translator = ctranslate2.Translator(MODEL,device=device)
-    elif backend=='transformers':
-        translator = transformers.AutoModelForSeq2SeqLM.from_pretrained(f"facebook/nllb-200-distilled-{model_size}")
+    elif nllb_backend=='transformers':
+        translator = transformers.AutoModelForSeq2SeqLM.from_pretrained(f"facebook/nllb-200-distilled-{nllb_size}")
     tokenizer = dict()
     for src_lang in src_langs:
         if src_lang != 'auto':
@@ -50,9 +50,9 @@ def load_model(src_langs, backend='ctranslate2', model_size='600M'):
     translation_model = TranslationModel(
         translator=translator,
         tokenizer=tokenizer,
-        backend_type=backend,
+        backend_type=nllb_backend,
         device = device,
-        model_size = model_size
+        nllb_size = nllb_size
     )
     for src_lang in src_langs:
         if src_lang != 'auto':
@@ -157,7 +157,7 @@ if __name__ == '__main__':
     test = test_string.split(' ')
     step = len(test) // 3
     
-    shared_model = load_model([input_lang], backend='ctranslate2')
+    shared_model = load_model([input_lang], nllb_backend='ctranslate2')
     online_translation = OnlineTranslation(shared_model, input_languages=[input_lang], output_languages=[output_lang])
     
     beg_inference = time.time()    

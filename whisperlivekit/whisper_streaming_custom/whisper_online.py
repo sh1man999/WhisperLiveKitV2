@@ -6,6 +6,7 @@ from functools import lru_cache
 import time
 import logging
 from .backends import FasterWhisperASR, MLXWhisper, WhisperTimestampedASR, OpenaiApiASR
+from whisperlivekit.warmup import warmup_asr
 
 logger = logging.getLogger(__name__)
 
@@ -63,11 +64,23 @@ def create_tokenizer(lan):
     return WtPtok()
 
 
-def backend_factory(args):
-    backend = args.backend
+def backend_factory(
+            backend,
+            lan,
+            model_size,
+            model_cache_dir,
+            model_dir,
+            task,
+            buffer_trimming,
+            buffer_trimming_sec,
+            confidence_validation,
+            warmup_file=None,
+            min_chunk_size=None,
+        ):
+    backend = backend
     if backend == "openai-api":
         logger.debug("Using OpenAI API.")
-        asr = OpenaiApiASR(lan=args.lan)        
+        asr = OpenaiApiASR(lan=lan)        
     else:
         if backend == "faster-whisper":
             asr_cls = FasterWhisperASR
@@ -77,34 +90,33 @@ def backend_factory(args):
             asr_cls = WhisperTimestampedASR
 
         # Only for FasterWhisperASR and WhisperTimestampedASR
-        size = args.model
+
         t = time.time()
-        logger.info(f"Loading Whisper {size} model for language {args.lan}...")
+        logger.info(f"Loading Whisper {model_size} model for language {lan}...")
         asr = asr_cls(
-            modelsize=size,
-            lan=args.lan,
-            cache_dir=getattr(args, 'model_cache_dir', None),
-            model_dir=getattr(args, 'model_dir', None),
+            model_size=model_size,
+            lan=lan,
+            cache_dir=model_cache_dir,
+            model_dir=model_dir,
         )
         e = time.time()
         logger.info(f"done. It took {round(e-t,2)} seconds.")
 
-    # Apply common configurations
-    if getattr(args, "vad", False):  # Checks if VAD argument is present and True
-        logger.info("Setting VAD filter")
-        asr.use_vad()
-
-    language = args.lan
-    if args.task == "translate":
-        if backend != "simulstreaming":
-            asr.set_translate_task()
+    if task == "translate":
         tgt_language = "en"  # Whisper translates into English
     else:
-        tgt_language = language  # Whisper transcribes in this language
+        tgt_language = lan  # Whisper transcribes in this language
 
     # Create the tokenizer
-    if args.buffer_trimming == "sentence":
+    if buffer_trimming == "sentence":
         tokenizer = create_tokenizer(tgt_language)
     else:
         tokenizer = None
-    return asr, tokenizer
+    
+    warmup_asr(asr, warmup_file)
+    
+    asr.confidence_validation = confidence_validation
+    asr.tokenizer = tokenizer
+    asr.buffer_trimming = buffer_trimming
+    asr.buffer_trimming_sec = buffer_trimming_sec
+    return asr

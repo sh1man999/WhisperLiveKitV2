@@ -47,7 +47,6 @@ class SimulStreamingOnlineProcessor:
         self,
         asr,
         logfile=sys.stderr,
-        warmup_file=None
     ):        
         self.asr = asr
         self.logfile = logfile
@@ -146,31 +145,20 @@ class SimulStreamingASR():
     """SimulStreaming backend with AlignAtt policy."""
     sep = ""
 
-    def __init__(self, lan, modelsize=None, cache_dir=None, model_dir=None, logfile=sys.stderr, **kwargs):
+    def __init__(self, logfile=sys.stderr, **kwargs):
         self.logfile = logfile
         self.transcribe_kargs = {}
-        self.original_language = lan
         
-        self.model_path = kwargs.get('model_path', './large-v3.pt')
-        self.frame_threshold = kwargs.get('frame_threshold', 25)
-        self.audio_max_len = kwargs.get('audio_max_len', 20.0)
-        self.audio_min_len = kwargs.get('audio_min_len', 0.0)
-        self.segment_length = kwargs.get('segment_length', 0.5)
-        self.beams = kwargs.get('beams', 1)
-        self.decoder_type = kwargs.get('decoder_type', 'greedy' if self.beams == 1 else 'beam')
-        self.task = kwargs.get('task', 'transcribe')
-        self.cif_ckpt_path = kwargs.get('cif_ckpt_path', None)
-        self.never_fire = kwargs.get('never_fire', False)
-        self.init_prompt = kwargs.get('init_prompt', None)
-        self.static_init_prompt = kwargs.get('static_init_prompt', None)
-        self.max_context_tokens = kwargs.get('max_context_tokens', None)
-        self.warmup_file = kwargs.get('warmup_file', None)
-        self.preload_model_count = kwargs.get('preload_model_count', 1)
-        self.disable_fast_encoder = kwargs.get('disable_fast_encoder', False)
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+        if self.decoder_type is None:
+            self.decoder_type = 'greedy' if self.beams == 1 else 'beam'
+
         self.fast_encoder = False
-        if model_dir is not None:
-            self.model_path = model_dir
-        elif modelsize is not None:
+        if self.model_dir is not None:
+            self.model_path = self.model_dir
+        elif self.model_size is not None:
             model_mapping = {
                 'tiny': './tiny.pt',
                 'base': './base.pt',
@@ -185,13 +173,13 @@ class SimulStreamingASR():
                 'large-v3': './large-v3.pt',
                 'large': './large-v3.pt'
             }
-            self.model_path = model_mapping.get(modelsize, f'./{modelsize}.pt')
+            self.model_path = model_mapping.get(self.model_size, f'./{self.model_size}.pt')
         
         self.cfg = AlignAttConfig(
                 model_path=self.model_path,
-                segment_length=self.segment_length,
+                segment_length=self.min_chunk_size,
                 frame_threshold=self.frame_threshold,
-                language=self.original_language,
+                language=self.lan,
                 audio_max_len=self.audio_max_len,
                 audio_min_len=self.audio_min_len,
                 cif_ckpt_path=self.cif_ckpt_path,
@@ -210,11 +198,15 @@ class SimulStreamingASR():
         else:
             self.tokenizer = None
         
-        self.model_name = os.path.basename(self.cfg.model_path).replace(".pt", "")
-        self.model_path = os.path.dirname(os.path.abspath(self.cfg.model_path))
+        if self.model_dir:
+            self.model_name = self.model_dir
+            self.model_path = None
+        else:
+            self.model_name = os.path.basename(self.cfg.model_path).replace(".pt", "")
+            self.model_path = os.path.dirname(os.path.abspath(self.cfg.model_path))
     
         self.mlx_encoder, self.fw_encoder = None, None
-        if not self.disable_fast_encoder:
+        if not self.disable_fast_encoder and not self.model_dir:
             if HAS_MLX_WHISPER:
                 print('Simulstreaming will use MLX whisper for a faster encoder.')
                 mlx_model_name = mlx_model_mapping[self.model_name]
@@ -233,7 +225,12 @@ class SimulStreamingASR():
 
 
     def load_model(self):
-        whisper_model = load_model(name=self.model_name, download_root=self.model_path, decoder_only=self.fast_encoder)
+        whisper_model = load_model(
+            name=self.model_name,
+            download_root=self.model_path,
+            decoder_only=self.fast_encoder,
+            custom_alignment_heads=self.custom_alignment_heads
+            )
         warmup_audio = load_file(self.warmup_file)
         if warmup_audio is not None:
             warmup_audio = torch.from_numpy(warmup_audio).float()
@@ -249,7 +246,7 @@ class SimulStreamingASR():
             else:
                 # For standard encoder, use the original transcribe warmup
                 warmup_audio = load_file(self.warmup_file)
-                whisper_model.transcribe(warmup_audio, language=self.original_language if self.original_language != 'auto' else None)
+                whisper_model.transcribe(warmup_audio, language=self.lan if self.lan != 'auto' else None)
         return whisper_model
     
     def get_new_model_instance(self):
