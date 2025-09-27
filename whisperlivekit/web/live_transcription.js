@@ -29,6 +29,8 @@ let selectedMicrophoneId = null;
 let serverUseAudioWorklet = null;
 let configReadyResolve;
 const configReady = new Promise((r) => (configReadyResolve = r));
+let outputAudioContext = null;
+let audioSource = null;
 
 waveCanvas.width = 60 * (window.devicePixelRatio || 1);
 waveCanvas.height = 30 * (window.devicePixelRatio || 1);
@@ -511,6 +513,15 @@ async function startRecording() {
             }
           });
         });
+        
+        try {
+          outputAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+          audioSource = outputAudioContext.createMediaStreamSource(stream);
+          audioSource.connect(outputAudioContext.destination);
+        } catch (audioError) {
+          console.warn('could not preserve system audio:', audioError);
+        }
+        
         statusText.textContent = "Using tab audio capture.";
       } catch (tabError) {
         console.log('Tab capture not available, falling back to microphone', tabError);
@@ -657,6 +668,16 @@ async function stopRecording() {
       console.warn("Could not close audio context:", e);
     }
     audioContext = null;
+  }
+
+  if (audioSource) {
+    audioSource.disconnect();
+    audioSource = null;
+  }
+
+  if (outputAudioContext && outputAudioContext.state !== "closed") {
+    outputAudioContext.close()
+    outputAudioContext = null;
   }
 
   if (animationFrame) {
