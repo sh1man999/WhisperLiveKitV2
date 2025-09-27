@@ -206,7 +206,7 @@ class SimulStreamingASR():
             self.model_path = os.path.dirname(os.path.abspath(self.cfg.model_path))
     
         self.mlx_encoder, self.fw_encoder = None, None
-        if not self.disable_fast_encoder and not self.model_dir:
+        if not self.disable_fast_encoder:
             if HAS_MLX_WHISPER:
                 print('Simulstreaming will use MLX whisper for a faster encoder.')
                 mlx_model_name = mlx_model_mapping[self.model_name]
