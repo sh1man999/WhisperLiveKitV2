@@ -368,7 +368,11 @@ class AudioProcessor:
                     if additional_token is SENTINEL:
                         sentinel_found = True
                         break
-                    tokens_to_process.append(additional_token)                
+                    elif type(additional_token) is Silence:
+                        self.translation.insert_silence(additional_token.duration)
+                        continue
+                    else:
+                        tokens_to_process.append(additional_token)                
                 if tokens_to_process:
                     self.translation.insert_tokens(tokens_to_process)
                     self.translated_segments = await asyncio.to_thread(self.translation.process)

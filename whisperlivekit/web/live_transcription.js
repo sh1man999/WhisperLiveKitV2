@@ -416,10 +416,13 @@ function renderLinesWithBuffer(
       }
       
       if (item.translation) {
-        currentLineText += `<div class="label_translation">
-          ${translationIcon}
-          <span>${item.translation}</span>
-        </div>`;
+        currentLineText += `
+            <div>
+                <div class="label_translation">
+                    ${translationIcon}
+                    <span>${item.translation}</span>
+                </div>
+            </div>`;
       }
 
       return currentLineText.trim().length > 0 || speakerLabel.length > 0
