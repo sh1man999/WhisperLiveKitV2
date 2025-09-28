@@ -57,6 +57,8 @@ class TranscriptionEngine:
         }
         transcription_common_params = update_with_kwargs(transcription_common_params, kwargs)                                            
 
+        if transcription_common_params['model_size'].endswith(".en"):
+            transcription_common_params["lan"] = "en"
         if 'no_transcription' in kwargs:
             global_params['transcription'] = not global_params['no_transcription']
         if 'no_vad' in kwargs:

@@ -126,7 +126,7 @@ class Line(TimedText):
     
     def to_dict(self):
         _dict = {
-            'speaker': abs(int(self.speaker)),
+            'speaker': int(self.speaker) if self.speaker != -1 else 1,
             'text': self.text,
             'start': format_time(self.start),
             'end': format_time(self.end),
@@ -151,7 +151,7 @@ class FrontData():
     def to_dict(self):
         _dict = {
             'status': self.status,
-            'lines': [line.to_dict() for line in self.lines if line.text],
+            'lines': [line.to_dict() for line in self.lines if (line.text or line.speaker == -2)],
             'buffer_transcription': self.buffer_transcription,
             'buffer_diarization': self.buffer_diarization,
             'remaining_time_transcription': self.remaining_time_transcription,
