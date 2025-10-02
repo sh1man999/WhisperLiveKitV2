@@ -483,7 +483,7 @@ class AudioProcessor:
                     status=response_status,
                     lines=lines,
                     buffer_transcription=buffer_transcription.text.strip(),
-                    buffer_diarization=buffer_diarization.strip(),
+                    buffer_diarization=buffer_diarization,
                     remaining_time_transcription=state.remaining_time_transcription,
                     remaining_time_diarization=state.remaining_time_diarization if self.args.diarization else 0
                 )

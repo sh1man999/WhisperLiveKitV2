@@ -483,7 +483,6 @@ label {
 
 .buffer_diarization {
   color: var(--label-dia-text);
-  margin-left: 4px;
 }
 
 .buffer_transcription {
@@ -600,8 +599,6 @@ label {
 .label_language {
   background-color: var(--chip-bg);
   margin-bottom: 0px;
-  margin-top: 5px;
-  height: 18.5px;
   border-radius: 100px;
   padding: 2px 8px;
   margin-left: 10px;

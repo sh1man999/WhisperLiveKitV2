@@ -22,11 +22,9 @@ try:
     HAS_MLX_WHISPER = True
 except ImportError:
     if platform.system() == "Darwin" and platform.machine() == "arm64":
-        print(f"""
-            {"="*50}
-            MLX Whisper not found but you are on Apple Silicon. Consider installing mlx-whisper for better performance: pip install mlx-whisper
-            {"="*50}
-            """)
+        print(f"""{"="*50}
+MLX Whisper not found but you are on Apple Silicon. Consider installing mlx-whisper for better performance: pip install mlx-whisper
+{"="*50}""")
     HAS_MLX_WHISPER = False
 if HAS_MLX_WHISPER:
     HAS_FASTER_WHISPER = False
