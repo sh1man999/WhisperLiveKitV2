@@ -13,24 +13,24 @@ WLK provides real-time speech transcription, speaker diarization, and translatio
 
 The current API sends complete state snapshots on each update (several time per second)
 
-```json
+```typescript
 {
-  "type": "transcript_update",
-  "status": "active_transcription",
+  "type": str,
+  "status": str,
   "lines": [
     {
-      "speaker": 1,
-      "text": "Complete transcription text",
-      "start": "0:00:05",
-      "end": "0:00:08",
-      "translation": "Optional translation",
-      "detected_language": "en"
+      "speaker": int,
+      "text": str,
+      "start": float,
+      "end": float,
+      "translation": str | null,
+      "detected_language": str
     }
   ],
-  "buffer_transcription": "pending transcription...",
-  "buffer_diarization": "pending diarization...",
-  "remaining_time_transcription": 0.5,
-  "remaining_time_diarization": 0.3
+  "buffer_transcription": str,
+  "buffer_diarization": str,
+  "remaining_time_transcription": float,
+  "remaining_time_diarization": float
 }
 ```
 
@@ -181,7 +181,7 @@ The API sends **only changed or new segments**. Clients should:
 
 When language is detected for a segment:
 
-```json
+```jsonc
 // Update 1: No language yet
 {
   "segments": [
@@ -205,7 +205,7 @@ Buffers are **per-segment** to handle multi-speaker scenarios correctly.
 
 #### Example: Translation with diarization and translation
 
-```json
+```jsonc
 // Update 1
 {
   "segments": [
@@ -223,13 +223,12 @@ Buffers are **per-segment** to handle multi-speaker scenarios correctly.
   ]
 }
 
-"""
-== Frontend ==
 
-<SPEAKER>1</SPEAKER>
-<TRANSCRIPTION>Hello world, how are <DIARIZATION BUFFER> you on</DIARIZATION BUFFER></TRANSCRIPTION>
-<TRANSLATION><TRANSLATION BUFFER>Bonjour le monde</TRANSLATION BUFFER></TRANSLATION>
-"""
+// ==== Frontend ====
+// <SPEAKER>1</SPEAKER>
+// <TRANSCRIPTION>Hello world, how are <DIARIZATION BUFFER> you on</DIARIZATION BUFFER></TRANSCRIPTION>
+// <TRANSLATION><TRANSLATION BUFFER>Bonjour le monde</TRANSLATION BUFFER></TRANSLATION>
+
 
 // Update 2
 {
@@ -248,20 +247,18 @@ Buffers are **per-segment** to handle multi-speaker scenarios correctly.
   ]
 }
 
-"""
-== Frontend ==
 
-<SPEAKER>1</SPEAKER>
-<TRANSCRIPTION>Hello world, how are you on this<DIARIZATION BUFFER>  beautiful day</DIARIZATION BUFFER></TRANSCRIPTION>
-<TRANSLATION>Bonjour tout le monde<TRANSLATION BUFFER>, comment</TRANSLATION BUFFER><TRANSLATION>
-"""
+// ==== Frontend ====
+// <SPEAKER>1</SPEAKER>
+// <TRANSCRIPTION>Hello world, how are you on this<DIARIZATION BUFFER>  beautiful day</DIARIZATION BUFFER></TRANSCRIPTION>
+// <TRANSLATION>Bonjour tout le monde<TRANSLATION BUFFER>, comment</TRANSLATION BUFFER><TRANSLATION>
 ```
 
 ### Silence Segments
 
 Silence is represented with the speaker id = `-2`:
 
-```json
+```jsonc
 {
   "id": 5,
   "speaker": -2,
