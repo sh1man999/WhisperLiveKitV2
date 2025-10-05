@@ -40,19 +40,14 @@ The current API sends complete state snapshots on each update (several time per 
 
 ### Philosophy
 
-Designed with the following principles:
+Principles:
 
-1. **Incremental Updates**: Only updates and new segments are sent
-2. **Word-Level Granularity**: Each word includes timing and validation status for text and speaker
-3. **Per-Segment Buffers**: Buffers are associated with specific speakers
-4. **Efficient Client-Side Handling**: Segments have IDs for easy front updates
-5. **Ephemeral Buffers**: Temporary, unvalidated data displayed in real-time but overwritten on next update
+- **Incremental Updates**: Only updates and new segments are sent
+- **Ephemeral Buffers**: Temporary, unvalidated data displayed in real-time but overwritten on next update, at speaker level
 
----
 
 ## Message Format
 
-### Transcript Update Message
 
 ```typescript
 {
