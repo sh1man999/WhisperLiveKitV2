@@ -116,7 +116,7 @@ class Translation(TimedText):
         
 
 @dataclass
-class Silence():
+class Silence:
     duration: float
     
     
@@ -139,7 +139,7 @@ class Line(TimedText):
     
 
 @dataclass  
-class FrontData():
+class FrontData:
     status: str = ''
     error: str = ''
     lines: list[Line] = field(default_factory=list)
@@ -167,10 +167,9 @@ class ChangeSpeaker:
     start: int
 
 @dataclass  
-class State():
+class State:
     tokens: list
-    translated_segments: list
-    buffer_transcription: str
+    buffer_transcription: str | Transcript
     end_buffer: float
     end_attributed_speaker: float
     remaining_time_transcription: float

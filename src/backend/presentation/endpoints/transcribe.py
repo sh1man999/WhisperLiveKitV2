@@ -48,9 +48,15 @@ async def transcribe(websocket: WebSocket, transcription_engine: FromDishka[Tran
     )
 
     try:
-        while True:
-            message = await websocket.receive_bytes()
-            await audio_processor.process_audio(message)
+        if url:
+            # For URL transcription, the AudioProcessor handles fetching and processing.
+            # We just need to wait for the results_generator to complete.
+            await websocket_task
+        else:
+            # For live audio input, continue receiving bytes from the client.
+            while True:
+                message = await websocket.receive_bytes()
+                await audio_processor.process_audio(message)
     except KeyError as e:
         if "bytes" in str(e):
             logger.warning("Client has closed the connection.")

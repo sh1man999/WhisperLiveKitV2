@@ -69,12 +69,11 @@ class AudioProcessor:
         self.silence = False
         self.silence_duration = 0.0
         self.tokens = []
-        self.translated_segments = []
         self.buffer_transcription = Transcript()
         self.end_buffer = 0
         self.end_attributed_speaker = 0
         self.lock = asyncio.Lock()
-        self.beg_loop = 0.0 #to deal with a potential little lag at the websocket initialization, this is now set in process_audio
+        self.beg_loop = time() if self.url else 0.0 # Initialize beg_loop if URL is present
         self.sep = " "  # Default separator
         self.last_response_content = FrontData()
         self.last_detected_speaker = None
@@ -95,7 +94,7 @@ class AudioProcessor:
         self.ffmpeg_reader_task = None
         self._ffmpeg_error = None
 
-        if not self.is_pcm_input or url:
+        if not self.is_pcm_input or self.url:
             self.ffmpeg_manager = FFmpegManager(
                 sample_rate=self.sample_rate,
                 channels=self.channels,
@@ -155,7 +154,6 @@ class AudioProcessor:
                 
             return State(
                 tokens=self.tokens.copy(),
-                translated_segments=self.translated_segments.copy(),
                 buffer_transcription=self.buffer_transcription,
                 end_buffer=self.end_buffer,
                 end_attributed_speaker=self.end_attributed_speaker,
@@ -167,7 +165,6 @@ class AudioProcessor:
         """Reset all state variables to initial values."""
         async with self.lock:
             self.tokens = []
-            self.translated_segments = []
             self.buffer_transcription = Transcript()
             self.end_buffer = self.end_attributed_speaker = 0
             self.beg_loop = time()
@@ -456,7 +453,7 @@ class AudioProcessor:
         processing_tasks_for_watchdog = []
 
         # If using FFmpeg (non-PCM input), start it and spawn stdout reader
-        if not self.is_pcm_input:
+        if not self.is_pcm_input or self.url:
             success = await self.ffmpeg_manager.start()
             if not success:
                 logger.error("Failed to start FFmpeg manager")
@@ -544,7 +541,7 @@ class AudioProcessor:
             if self.transcription_queue:
                 await self.transcription_queue.put(SENTINEL)
 
-            if not self.is_pcm_input and self.ffmpeg_manager:
+            if self.ffmpeg_manager:
                 await self.ffmpeg_manager.stop()
 
             return
@@ -553,7 +550,7 @@ class AudioProcessor:
             logger.warning("AudioProcessor is stopping. Ignoring incoming audio.")
             return
 
-        if self.is_pcm_input:
+        if self.is_pcm_input and not self.url:
             self.pcm_buffer.extend(message)
             await self.handle_pcm_data()
         if self.ffmpeg_manager and not self.url:

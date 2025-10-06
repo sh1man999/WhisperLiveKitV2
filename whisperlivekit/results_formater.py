@@ -53,7 +53,6 @@ def format_output(state, silence, current_time, args, debug, sep):
     diarization = args.diarization
     disable_punctuation_split = args.disable_punctuation_split
     tokens = state.tokens
-    translated_segments = state.translated_segments # Here we will attribute the speakers only based on the timestamps of the segments
     end_attributed_speaker = state.end_attributed_speaker
     
     previous_speaker = -1
@@ -123,37 +122,6 @@ def format_output(state, silence, current_time, args, debug, sep):
                 pass
             
         append_token_to_last_line(lines, sep, token, debug_info)
-
-    if lines and translated_segments:
-        unassigned_translated_segments = []
-        for ts in translated_segments:
-            assigned = False
-            for line in lines:
-                if ts and ts.overlaps_with(line):
-                    if ts.is_within(line):
-                        line.translation += ts.text + ' '
-                        assigned = True
-                        break
-                    else:
-                        ts0, ts1 = ts.approximate_cut_at(line.end)
-                        if ts0 and line.overlaps_with(ts0):
-                            line.translation += ts0.text + ' '
-                        if ts1:
-                            unassigned_translated_segments.append(ts1)
-                        assigned = True
-                        break
-            if not assigned:
-                unassigned_translated_segments.append(ts)
-        
-        if unassigned_translated_segments:
-            for line in lines:
-                remaining_segments = []
-                for ts in unassigned_translated_segments:
-                    if ts and ts.overlaps_with(line):
-                        line.translation += ts.text + ' '
-                    else:
-                        remaining_segments.append(ts)
-                unassigned_translated_segments = remaining_segments #maybe do smth in the future about that
     
     if state.buffer_transcription and lines:
         lines[-1].end = max(state.buffer_transcription.end, lines[-1].end)
