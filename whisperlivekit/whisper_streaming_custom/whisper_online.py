@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-import sys
-import numpy as np
-import librosa
-from functools import lru_cache
 import time
 import logging
-from .backends import FasterWhisperASR, MLXWhisper, WhisperTimestampedASR, OpenaiApiASR
+from typing import Union
+
+from .backends import FasterWhisperASR
 from whisperlivekit.warmup import warmup_asr
 
 logger = logging.getLogger(__name__)
@@ -23,15 +21,6 @@ def create_tokenizer(lan):
     assert (
         lan in WHISPER_LANG_CODES
     ), "language must be Whisper's supported lang code: " + " ".join(WHISPER_LANG_CODES)
-
-    if lan == "uk":
-        import tokenize_uk
-
-        class UkrainianTokenizer:
-            def split(self, text):
-                return tokenize_uk.tokenize_sents(text)
-
-        return UkrainianTokenizer()
 
     # supported by fast-mosestokenizer
     if (
@@ -65,51 +54,40 @@ def create_tokenizer(lan):
 
 
 def backend_factory(
-            backend,
             lan,
             model_size,
             model_cache_dir,
             model_dir,
-            task,
             buffer_trimming,
             buffer_trimming_sec,
             confidence_validation,
             warmup_file=None,
             min_chunk_size=None,
+            device="auto",
+            device_index: Union[int, list[int]] = 0,
+            cpu_threads: int = 0,
+            num_workers: int = 1
         ):
-    backend = backend
-    if backend == "openai-api":
-        logger.debug("Using OpenAI API.")
-        asr = OpenaiApiASR(lan=lan)        
-    else:
-        if backend == "faster-whisper":
-            asr_cls = FasterWhisperASR
-        elif backend == "mlx-whisper":
-            asr_cls = MLXWhisper
-        else:
-            asr_cls = WhisperTimestampedASR
 
-        # Only for FasterWhisperASR and WhisperTimestampedASR
-
-        t = time.time()
-        logger.info(f"Loading Whisper {model_size} model for language {lan}...")
-        asr = asr_cls(
-            model_size=model_size,
-            lan=lan,
-            cache_dir=model_cache_dir,
-            model_dir=model_dir,
-        )
-        e = time.time()
-        logger.info(f"done. It took {round(e-t,2)} seconds.")
-
-    if task == "translate":
-        tgt_language = "en"  # Whisper translates into English
-    else:
-        tgt_language = lan  # Whisper transcribes in this language
+    t = time.time()
+    logger.info(f"Loading Whisper {model_size} model for language {lan}...")
+    asr = FasterWhisperASR(
+        model_size=model_size,
+        lan=lan,
+        cache_dir=model_cache_dir,
+        model_dir=model_dir,
+        device=device,
+        device_index=device_index,
+        cpu_threads=cpu_threads,
+        num_workers=num_workers
+    )
+    e = time.time()
+    logger.info(f"done. It took {round(e - t, 2)} seconds.")
+    #asr.use_vad()
 
     # Create the tokenizer
     if buffer_trimming == "sentence":
-        tokenizer = create_tokenizer(tgt_language)
+        tokenizer = create_tokenizer(lan)
     else:
         tokenizer = None
     

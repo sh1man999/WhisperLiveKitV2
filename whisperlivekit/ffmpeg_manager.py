@@ -5,7 +5,6 @@ from typing import Optional, Callable
 import contextlib
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
 ERROR_INSTALL_INSTRUCTIONS = f"""
 {'='*50}
@@ -37,9 +36,10 @@ class FFmpegState(Enum):
     FAILED = "failed"
 
 class FFmpegManager:
-    def __init__(self, sample_rate: int = 16000, channels: int = 1):
+    def __init__(self, sample_rate: int = 16000, channels: int = 1, url: str| None = None):
         self.sample_rate = sample_rate
         self.channels = channels
+        self.url = url
 
         self.process: Optional[asyncio.subprocess.Process] = None
         self._stderr_task: Optional[asyncio.Task] = None
@@ -49,6 +49,24 @@ class FFmpegManager:
         self.state = FFmpegState.STOPPED
         self._state_lock = asyncio.Lock()
 
+    def _build_command(self):
+        if self.url:
+            input_source = self.url
+        else: # mic mode
+            input_source = "pipe:0"
+
+        return [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel", "error",
+            "-i", input_source,
+            "-f", "s16le",
+            "-acodec", "pcm_s16le",
+            "-ac", str(self.channels),
+            "-ar", str(self.sample_rate),
+            "pipe:1"
+        ]
+
     async def start(self) -> bool:
         async with self._state_lock:
             if self.state != FFmpegState.STOPPED:
@@ -57,17 +75,7 @@ class FFmpegManager:
             self.state = FFmpegState.STARTING
 
         try:
-            cmd = [
-                "ffmpeg",
-                "-hide_banner",
-                "-loglevel", "error",
-                "-i", "pipe:0",
-                "-f", "s16le",
-                "-acodec", "pcm_s16le",
-                "-ac", str(self.channels),
-                "-ar", str(self.sample_rate),
-                "pipe:1"
-            ]
+            cmd = self._build_command()
 
             self.process = await asyncio.create_subprocess_exec(
                 *cmd,

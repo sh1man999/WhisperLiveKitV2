@@ -197,7 +197,7 @@ class OnlineASRProcessor:
         return self.concatenate_tokens(self.transcript_buffer.buffer)
         
 
-    def process_iter(self) -> Tuple[List[ASRToken], float]:
+    def process_iter(self, language: str = None) -> Tuple[List[ASRToken], float]:
         """
         Processes the current audio buffer.
 
@@ -208,7 +208,7 @@ class OnlineASRProcessor:
         logger.debug(
             f"Transcribing {len(self.audio_buffer)/self.SAMPLING_RATE:.2f} seconds from {self.buffer_time_offset:.2f}"
         )
-        res = self.asr.transcribe(self.audio_buffer, init_prompt=prompt_text)
+        res = self.asr.transcribe(self.audio_buffer, init_prompt=prompt_text, language=language)
         tokens = self.asr.ts_words(res)
         self.transcript_buffer.insert(tokens, self.buffer_time_offset)
         committed_tokens = self.transcript_buffer.flush()
