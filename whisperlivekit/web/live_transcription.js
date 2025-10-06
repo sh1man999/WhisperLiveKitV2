@@ -1,6 +1,6 @@
 const isExtension = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL;
 if (isExtension) {
-  document.documentElement.classList.add('is-extension');
+    document.documentElement.classList.add('is-extension');
 }
 const isWebContext = !isExtension;
 
@@ -31,6 +31,109 @@ let configReadyResolve;
 const configReady = new Promise((r) => (configReadyResolve = r));
 let outputAudioContext = null;
 let audioSource = null;
+let selectedLanguage = "auto";
+const LANGUAGES = {
+    "en": "english",
+    "zh": "chinese",
+    "de": "german",
+    "es": "spanish",
+    "ru": "russian",
+    "ko": "korean",
+    "fr": "french",
+    "ja": "japanese",
+    "pt": "portuguese",
+    "tr": "turkish",
+    "pl": "polish",
+    "ca": "catalan",
+    "nl": "dutch",
+    "ar": "arabic",
+    "sv": "swedish",
+    "it": "italian",
+    "id": "indonesian",
+    "hi": "hindi",
+    "fi": "finnish",
+    "vi": "vietnamese",
+    "he": "hebrew",
+    "uk": "ukrainian",
+    "el": "greek",
+    "ms": "malay",
+    "cs": "czech",
+    "ro": "romanian",
+    "da": "danish",
+    "hu": "hungarian",
+    "ta": "tamil",
+    "no": "norwegian",
+    "th": "thai",
+    "ur": "urdu",
+    "hr": "croatian",
+    "bg": "bulgarian",
+    "lt": "lithuanian",
+    "la": "latin",
+    "mi": "maori",
+    "ml": "malayalam",
+    "cy": "welsh",
+    "sk": "slovak",
+    "te": "telugu",
+    "fa": "persian",
+    "lv": "latvian",
+    "bn": "bengali",
+    "sr": "serbian",
+    "az": "azerbaijani",
+    "sl": "slovenian",
+    "kn": "kannada",
+    "et": "estonian",
+    "mk": "macedonian",
+    "br": "breton",
+    "eu": "basque",
+    "is": "icelandic",
+    "hy": "armenian",
+    "ne": "nepali",
+    "mn": "mongolian",
+    "bs": "bosnian",
+    "kk": "kazakh",
+    "sq": "albanian",
+    "sw": "swahili",
+    "gl": "galician",
+    "mr": "marathi",
+    "pa": "punjabi",
+    "si": "sinhala",
+    "km": "khmer",
+    "sn": "shona",
+    "yo": "yoruba",
+    "so": "somali",
+    "af": "afrikaans",
+    "oc": "occitan",
+    "ka": "georgian",
+    "be": "belarusian",
+    "tg": "tajik",
+    "sd": "sindhi",
+    "gu": "gujarati",
+    "am": "amharic",
+    "yi": "yiddish",
+    "lo": "lao",
+    "uz": "uzbek",
+    "fo": "faroese",
+    "ht": "haitian creole",
+    "ps": "pashto",
+    "tk": "turkmen",
+    "nn": "nynorsk",
+    "mt": "maltese",
+    "sa": "sanskrit",
+    "lb": "luxembourgish",
+    "my": "myanmar",
+    "bo": "tibetan",
+    "tl": "tagalog",
+    "mg": "malagasy",
+    "as": "assamese",
+    "tt": "tatar",
+    "haw": "hawaiian",
+    "ln": "lingala",
+    "ha": "hausa",
+    "ba": "bashkir",
+    "jw": "javanese",
+    "su": "sundanese",
+    "yue": "cantonese",
+};
 
 waveCanvas.width = 60 * (window.devicePixelRatio || 1);
 waveCanvas.height = 30 * (window.devicePixelRatio || 1);
@@ -45,6 +148,7 @@ const linesTranscriptDiv = document.getElementById("linesTranscript");
 const timerElement = document.querySelector(".timer");
 const themeRadios = document.querySelectorAll('input[name="theme"]');
 const microphoneSelect = document.getElementById("microphoneSelect");
+const languageSelect = document.getElementById("languageSelect");
 
 const settingsToggle = document.getElementById("settingsToggle");
 const settingsDiv = document.querySelector(".settings");
@@ -67,114 +171,151 @@ const languageIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="12" viewBo
 const speakerIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="16px" style="vertical-align: text-bottom;" viewBox="0 -960 960 960" width="16px" fill="#5f6368"><path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-240v-32q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v32q0 33-23.5 56.5T720-160H240q-33 0-56.5-23.5T160-240Zm80 0h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T560-640q0-33-23.5-56.5T480-720q-33 0-56.5 23.5T400-640q0 33 23.5 56.5T480-560Zm0-80Zm0 400Z"/></svg>`;
 
 function getWaveStroke() {
-  const styles = getComputedStyle(document.documentElement);
-  const v = styles.getPropertyValue("--wave-stroke").trim();
-  return v || "#000";
+    const styles = getComputedStyle(document.documentElement);
+    const v = styles.getPropertyValue("--wave-stroke").trim();
+    return v || "#000";
 }
 
 let waveStroke = getWaveStroke();
+
 function updateWaveStroke() {
-  waveStroke = getWaveStroke();
+    waveStroke = getWaveStroke();
 }
 
 function applyTheme(pref) {
-  if (pref === "light") {
-    document.documentElement.setAttribute("data-theme", "light");
-  } else if (pref === "dark") {
-    document.documentElement.setAttribute("data-theme", "dark");
-  } else {
-    document.documentElement.removeAttribute("data-theme");
-  }
-  updateWaveStroke();
+    if (pref === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+    } else if (pref === "dark") {
+        document.documentElement.setAttribute("data-theme", "dark");
+    } else {
+        document.documentElement.removeAttribute("data-theme");
+    }
+    updateWaveStroke();
 }
 
 // Persisted theme preference
 const savedThemePref = localStorage.getItem("themePreference") || "system";
 applyTheme(savedThemePref);
 if (themeRadios.length) {
-  themeRadios.forEach((r) => {
-    r.checked = r.value === savedThemePref;
-    r.addEventListener("change", () => {
-      if (r.checked) {
-        localStorage.setItem("themePreference", r.value);
-        applyTheme(r.value);
-      }
+    themeRadios.forEach((r) => {
+        r.checked = r.value === savedThemePref;
+        r.addEventListener("change", () => {
+            if (r.checked) {
+                localStorage.setItem("themePreference", r.value);
+                applyTheme(r.value);
+            }
+        });
     });
-  });
 }
 
 // React to OS theme changes when in "system" mode
 const darkMq = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
 const handleOsThemeChange = () => {
-  const pref = localStorage.getItem("themePreference") || "system";
-  if (pref === "system") updateWaveStroke();
+    const pref = localStorage.getItem("themePreference") || "system";
+    if (pref === "system") updateWaveStroke();
 };
 if (darkMq && darkMq.addEventListener) {
-  darkMq.addEventListener("change", handleOsThemeChange);
+    darkMq.addEventListener("change", handleOsThemeChange);
 } else if (darkMq && darkMq.addListener) {
-  // deprecated, but included for Safari compatibility
-  darkMq.addListener(handleOsThemeChange);
+    // deprecated, but included for Safari compatibility
+    darkMq.addListener(handleOsThemeChange);
+}
+
+function populateLanguageSelect() {
+    if (!languageSelect) return;
+
+    for (const [code, name] of Object.entries(LANGUAGES)) {
+        const option = document.createElement('option');
+        option.value = code;
+        option.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+        languageSelect.appendChild(option);
+    }
+
+    const savedLanguage = localStorage.getItem('selectedLanguage');
+    if (savedLanguage && LANGUAGES[savedLanguage]) {
+        languageSelect.value = savedLanguage;
+        selectedLanguage = savedLanguage;
+    } else {
+        languageSelect.value = "auto";
+        selectedLanguage = "auto";
+    }
 }
 
 async function enumerateMicrophones() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach(track => track.stop());
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+        stream.getTracks().forEach(track => track.stop());
 
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    availableMicrophones = devices.filter(device => device.kind === 'audioinput');
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        availableMicrophones = devices.filter(device => device.kind === 'audioinput');
 
-    populateMicrophoneSelect();
-    console.log(`Found ${availableMicrophones.length} microphone(s)`);
-  } catch (error) {
-    console.error('Error enumerating microphones:', error);
-    statusText.textContent = "Error accessing microphones. Please grant permission.";
-  }
+        populateMicrophoneSelect();
+        console.log(`Found ${availableMicrophones.length} microphone(s)`);
+    } catch (error) {
+        console.error('Error enumerating microphones:', error);
+        statusText.textContent = "Error accessing microphones. Please grant permission.";
+    }
 }
 
 function populateMicrophoneSelect() {
-  if (!microphoneSelect) return;
+    if (!microphoneSelect) return;
 
-  microphoneSelect.innerHTML = '<option value="">Default Microphone</option>';
+    microphoneSelect.innerHTML = '<option value="">Default Microphone</option>';
 
-  availableMicrophones.forEach((device, index) => {
-    const option = document.createElement('option');
-    option.value = device.deviceId;
-    option.textContent = device.label || `Microphone ${index + 1}`;
-    microphoneSelect.appendChild(option);
-  });
+    availableMicrophones.forEach((device, index) => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.textContent = device.label || `Microphone ${index + 1}`;
+        microphoneSelect.appendChild(option);
+    });
 
-  const savedMicId = localStorage.getItem('selectedMicrophone');
-  if (savedMicId && availableMicrophones.some(mic => mic.deviceId === savedMicId)) {
-    microphoneSelect.value = savedMicId;
-    selectedMicrophoneId = savedMicId;
-  }
+    const savedMicId = localStorage.getItem('selectedMicrophone');
+    if (savedMicId && availableMicrophones.some(mic => mic.deviceId === savedMicId)) {
+        microphoneSelect.value = savedMicId;
+        selectedMicrophoneId = savedMicId;
+    }
+}
+
+function handleLanguageChange() {
+    selectedLanguage = languageSelect.value;
+    localStorage.setItem('selectedLanguage', selectedLanguage);
+    console.log(`Selected language: ${selectedLanguage}`);
+    statusText.textContent = `Language changed to: ${selectedLanguage}`;
+
+    if (isRecording) {
+        statusText.textContent = "Switching language... Please wait.";
+        stopRecording().then(() => {
+            setTimeout(() => {
+                toggleRecording();
+            }, 1000);
+        });
+    }
 }
 
 function handleMicrophoneChange() {
-  selectedMicrophoneId = microphoneSelect.value || null;
-  localStorage.setItem('selectedMicrophone', selectedMicrophoneId || '');
+    selectedMicrophoneId = microphoneSelect.value || null;
+    localStorage.setItem('selectedMicrophone', selectedMicrophoneId || '');
 
-  const selectedDevice = availableMicrophones.find(mic => mic.deviceId === selectedMicrophoneId);
-  const deviceName = selectedDevice ? selectedDevice.label : 'Default Microphone';
+    const selectedDevice = availableMicrophones.find(mic => mic.deviceId === selectedMicrophoneId);
+    const deviceName = selectedDevice ? selectedDevice.label : 'Default Microphone';
 
-  console.log(`Selected microphone: ${deviceName}`);
-  statusText.textContent = `Microphone changed to: ${deviceName}`;
+    console.log(`Selected microphone: ${deviceName}`);
+    statusText.textContent = `Microphone changed to: ${deviceName}`;
 
-  if (isRecording) {
-    statusText.textContent = "Switching microphone... Please wait.";
-    stopRecording().then(() => {
-      setTimeout(() => {
-        toggleRecording();
-      }, 1000);
-    });
-  }
+    if (isRecording) {
+        statusText.textContent = "Switching microphone... Please wait.";
+        stopRecording().then(() => {
+            setTimeout(() => {
+                toggleRecording();
+            }, 1000);
+        });
+    }
 }
 
 // Helpers
 function fmt1(x) {
-  const n = Number(x);
-  return Number.isFinite(n) ? n.toFixed(1) : x;
+    const n = Number(x);
+    return Number.isFinite(n) ? n.toFixed(1) : x;
 }
 
 let host, port, protocol;
@@ -197,608 +338,626 @@ websocketUrl = defaultWebSocketUrl;
 
 // Optional chunk selector (guard for presence)
 if (chunkSelector) {
-  chunkSelector.addEventListener("change", () => {
-    chunkDuration = parseInt(chunkSelector.value);
-  });
+    chunkSelector.addEventListener("change", () => {
+        chunkDuration = parseInt(chunkSelector.value);
+    });
 }
 
 // WebSocket input change handling
 websocketInput.addEventListener("change", () => {
-  const urlValue = websocketInput.value.trim();
-  if (!urlValue.startsWith("ws://") && !urlValue.startsWith("wss://")) {
-    statusText.textContent = "Invalid WebSocket URL (must start with ws:// or wss://)";
-    return;
-  }
-  websocketUrl = urlValue;
-  statusText.textContent = "WebSocket URL updated. Ready to connect.";
+    const urlValue = websocketInput.value.trim();
+    if (!urlValue.startsWith("ws://") && !urlValue.startsWith("wss://")) {
+        statusText.textContent = "Invalid WebSocket URL (must start with ws:// or wss://)";
+        return;
+    }
+    websocketUrl = urlValue;
+    statusText.textContent = "WebSocket URL updated. Ready to connect.";
 });
 
 function setupWebSocket() {
-  return new Promise((resolve, reject) => {
-    try {
-      websocket = new WebSocket(websocketUrl);
-    } catch (error) {
-      statusText.textContent = "Invalid WebSocket URL. Please check and try again.";
-      reject(error);
-      return;
-    }
+    return new Promise((resolve, reject) => {
+        try {
+            const currentUrl = new URL(websocketUrl);
+            currentUrl.searchParams.set("language", selectedLanguage);
+            websocket = new WebSocket(currentUrl.toString());
+        } catch (error) {
+            statusText.textContent = "Invalid WebSocket URL. Please check and try again.";
+            reject(error);
+            return;
+        }
 
-    websocket.onopen = () => {
-      statusText.textContent = "Connected to server.";
-      resolve();
-    };
+        websocket.onopen = () => {
+            statusText.textContent = "Connected to server.";
+            resolve();
+        };
 
-    websocket.onclose = () => {
-      if (userClosing) {
-        if (waitingForStop) {
-          statusText.textContent = "Processing finalized or connection closed.";
-          if (lastReceivedData) {
+        websocket.onclose = () => {
+            if (userClosing) {
+                if (waitingForStop) {
+                    statusText.textContent = "Processing finalized or connection closed.";
+                    if (lastReceivedData) {
+                        renderLinesWithBuffer(
+                            lastReceivedData.lines || [],
+                            lastReceivedData.buffer_diarization || "",
+                            lastReceivedData.buffer_transcription || "",
+                            0,
+                            0,
+                            true
+                        );
+                    }
+                }
+            } else {
+                statusText.textContent = "Disconnected from the WebSocket server. (Check logs if model is loading.)";
+                if (isRecording) {
+                    stopRecording();
+                }
+            }
+            isRecording = false;
+            waitingForStop = false;
+            userClosing = false;
+            lastReceivedData = null;
+            websocket = null;
+            updateUI();
+        };
+
+        websocket.onerror = () => {
+            statusText.textContent = "Error connecting to WebSocket.";
+            reject(new Error("Error connecting to WebSocket"));
+        };
+
+        websocket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === "config") {
+                serverUseAudioWorklet = !!data.useAudioWorklet;
+                statusText.textContent = serverUseAudioWorklet
+                    ? "Connected. Using AudioWorklet (PCM)."
+                    : "Connected. Using MediaRecorder (WebM).";
+                if (configReadyResolve) configReadyResolve();
+                return;
+            }
+
+            if (data.type === "ready_to_stop") {
+                console.log("Ready to stop received, finalizing display and closing WebSocket.");
+                waitingForStop = false;
+
+                if (lastReceivedData) {
+                    renderLinesWithBuffer(
+                        lastReceivedData.lines || [],
+                        lastReceivedData.buffer_diarization || "",
+                        lastReceivedData.buffer_transcription || "",
+                        0,
+                        0,
+                        true
+                    );
+                }
+                statusText.textContent = "Finished processing audio! Ready to record again.";
+                recordButton.disabled = false;
+
+                if (websocket) {
+                    websocket.close();
+                }
+                return;
+            }
+
+            lastReceivedData = data;
+
+            const {
+                lines = [],
+                buffer_transcription = "",
+                buffer_diarization = "",
+                remaining_time_transcription = 0,
+                remaining_time_diarization = 0,
+                status = "active_transcription",
+            } = data;
+
             renderLinesWithBuffer(
-              lastReceivedData.lines || [],
-              lastReceivedData.buffer_diarization || "",
-              lastReceivedData.buffer_transcription || "",
-              0,
-              0,
-              true
+                lines,
+                buffer_diarization,
+                buffer_transcription,
+                remaining_time_diarization,
+                remaining_time_transcription,
+                false,
+                status
             );
-          }
-        }
-      } else {
-        statusText.textContent = "Disconnected from the WebSocket server. (Check logs if model is loading.)";
-        if (isRecording) {
-          stopRecording();
-        }
-      }
-      isRecording = false;
-      waitingForStop = false;
-      userClosing = false;
-      lastReceivedData = null;
-      websocket = null;
-      updateUI();
-    };
-
-    websocket.onerror = () => {
-      statusText.textContent = "Error connecting to WebSocket.";
-      reject(new Error("Error connecting to WebSocket"));
-    };
-
-    websocket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "config") {
-        serverUseAudioWorklet = !!data.useAudioWorklet;
-        statusText.textContent = serverUseAudioWorklet
-          ? "Connected. Using AudioWorklet (PCM)."
-          : "Connected. Using MediaRecorder (WebM).";
-        if (configReadyResolve) configReadyResolve();
-        return;
-      }
-
-      if (data.type === "ready_to_stop") {
-        console.log("Ready to stop received, finalizing display and closing WebSocket.");
-        waitingForStop = false;
-
-        if (lastReceivedData) {
-          renderLinesWithBuffer(
-            lastReceivedData.lines || [],
-            lastReceivedData.buffer_diarization || "",
-            lastReceivedData.buffer_transcription || "",
-            0,
-            0,
-            true
-          );
-        }
-        statusText.textContent = "Finished processing audio! Ready to record again.";
-        recordButton.disabled = false;
-
-        if (websocket) {
-          websocket.close();
-        }
-        return;
-      }
-
-      lastReceivedData = data;
-
-      const {
-        lines = [],
-        buffer_transcription = "",
-        buffer_diarization = "",
-        remaining_time_transcription = 0,
-        remaining_time_diarization = 0,
-        status = "active_transcription",
-      } = data;
-
-      renderLinesWithBuffer(
-        lines,
-        buffer_diarization,
-        buffer_transcription,
-        remaining_time_diarization,
-        remaining_time_transcription,
-        false,
-        status
-      );
-    };
-  });
+        };
+    });
 }
 
 function renderLinesWithBuffer(
-  lines,
-  buffer_diarization,
-  buffer_transcription,
-  remaining_time_diarization,
-  remaining_time_transcription,
-  isFinalizing = false,
-  current_status = "active_transcription"
+    lines,
+    buffer_diarization,
+    buffer_transcription,
+    remaining_time_diarization,
+    remaining_time_transcription,
+    isFinalizing = false,
+    current_status = "active_transcription"
 ) {
-  if (current_status === "no_audio_detected") {
-    linesTranscriptDiv.innerHTML =
-      "<p style='text-align: center; color: var(--muted); margin-top: 20px;'><em>No audio detected...</em></p>";
-    return;
-  }
+    if (current_status === "no_audio_detected") {
+        linesTranscriptDiv.innerHTML =
+            "<p style='text-align: center; color: var(--muted); margin-top: 20px;'><em>No audio detected...</em></p>";
+        return;
+    }
 
-  const showLoading = !isFinalizing && (lines || []).some((it) => it.speaker == 0);
-  const showTransLag = !isFinalizing && remaining_time_transcription > 0;
-  const showDiaLag = !isFinalizing && !!buffer_diarization && remaining_time_diarization > 0;
-  const signature = JSON.stringify({
-    lines: (lines || []).map((it) => ({ speaker: it.speaker, text: it.text, start: it.start, end: it.end, detected_language: it.detected_language })),
-    buffer_transcription: buffer_transcription || "",
-    buffer_diarization: buffer_diarization || "",
-    status: current_status,
-    showLoading,
-    showTransLag,
-    showDiaLag,
-    isFinalizing: !!isFinalizing,
-  });
-  if (lastSignature === signature) {
-    const t = document.querySelector(".lag-transcription-value");
-    if (t) t.textContent = fmt1(remaining_time_transcription);
-    const d = document.querySelector(".lag-diarization-value");
-    if (d) d.textContent = fmt1(remaining_time_diarization);
-    const ld = document.querySelector(".loading-diarization-value");
-    if (ld) ld.textContent = fmt1(remaining_time_diarization);
-    return;
-  }
-  lastSignature = signature;
+    const showLoading = !isFinalizing && (lines || []).some((it) => it.speaker == 0);
+    const showTransLag = !isFinalizing && remaining_time_transcription > 0;
+    const showDiaLag = !isFinalizing && !!buffer_diarization && remaining_time_diarization > 0;
+    const signature = JSON.stringify({
+        lines: (lines || []).map((it) => ({
+            speaker: it.speaker,
+            text: it.text,
+            start: it.start,
+            end: it.end,
+            detected_language: it.detected_language
+        })),
+        buffer_transcription: buffer_transcription || "",
+        buffer_diarization: buffer_diarization || "",
+        status: current_status,
+        showLoading,
+        showTransLag,
+        showDiaLag,
+        isFinalizing: !!isFinalizing,
+    });
+    if (lastSignature === signature) {
+        const t = document.querySelector(".lag-transcription-value");
+        if (t) t.textContent = fmt1(remaining_time_transcription);
+        const d = document.querySelector(".lag-diarization-value");
+        if (d) d.textContent = fmt1(remaining_time_diarization);
+        const ld = document.querySelector(".loading-diarization-value");
+        if (ld) ld.textContent = fmt1(remaining_time_diarization);
+        return;
+    }
+    lastSignature = signature;
 
-  const linesHtml = (lines || [])
-    .map((item, idx) => {
-      let timeInfo = "";
-      if (item.start !== undefined && item.end !== undefined) {
-        timeInfo = ` ${item.start} - ${item.end}`;
-      }
+    const linesHtml = (lines || [])
+        .map((item, idx) => {
+            let timeInfo = "";
+            if (item.start !== undefined && item.end !== undefined) {
+                timeInfo = ` ${item.start} - ${item.end}`;
+            }
 
-      let speakerLabel = "";
-      if (item.speaker === -2) {
-        speakerLabel = `<span class="silence">${silenceIcon}<span id='timeInfo'>${timeInfo}</span></span>`;
-      } else if (item.speaker == 0 && !isFinalizing) {
-        speakerLabel = `<span class='loading'><span class="spinner"></span><span id='timeInfo'><span class="loading-diarization-value">${fmt1(
-          remaining_time_diarization
-        )}</span> second(s) of audio are undergoing diarization</span></span>`;
-      } else if (item.speaker !== 0) {
-        const speakerNum = `<span class="speaker-badge">${item.speaker}</span>`;
-        speakerLabel = `<span id="speaker">${speakerIcon}${speakerNum}<span id='timeInfo'>${timeInfo}</span></span>`;
+            let speakerLabel = "";
+            if (item.speaker === -2) {
+                speakerLabel = `<span class="silence">${silenceIcon}<span id='timeInfo'>${timeInfo}</span></span>`;
+            } else if (item.speaker == 0 && !isFinalizing) {
+                speakerLabel = `<span class='loading'><span class="spinner"></span><span id='timeInfo'><span class="loading-diarization-value">${fmt1(
+                    remaining_time_diarization
+                )}</span> second(s) of audio are undergoing diarization</span></span>`;
+            } else if (item.speaker !== 0) {
+                const speakerNum = `<span class="speaker-badge">${item.speaker}</span>`;
+                speakerLabel = `<span id="speaker">${speakerIcon}${speakerNum}<span id='timeInfo'>${timeInfo}</span></span>`;
 
-        if (item.detected_language) {
-          speakerLabel += `<span class="label_language">${languageIcon}<span>${item.detected_language}</span></span>`;
-        }
-      }
+                if (item.detected_language) {
+                    speakerLabel += `<span class="label_language">${languageIcon}<span>${item.detected_language}</span></span>`;
+                }
+            }
 
-      let currentLineText = item.text || "";
+            let currentLineText = item.text || "";
 
-      if (idx === lines.length - 1) {
-        if (!isFinalizing && item.speaker !== -2) {
-          if (remaining_time_transcription > 0) {
-            speakerLabel += `<span class="label_transcription"><span class="spinner"></span>Transcription lag <span id='timeInfo'><span class="lag-transcription-value">${fmt1(
-              remaining_time_transcription
-            )}</span>s</span></span>`;
-          }
-          if (buffer_diarization && remaining_time_diarization > 0) {
-            speakerLabel += `<span class="label_diarization"><span class="spinner"></span>Diarization lag<span id='timeInfo'><span class="lag-diarization-value">${fmt1(
-              remaining_time_diarization
-            )}</span>s</span></span>`;
-          }
-        }
+            if (idx === lines.length - 1) {
+                if (!isFinalizing && item.speaker !== -2) {
+                    if (remaining_time_transcription > 0) {
+                        speakerLabel += `<span class="label_transcription"><span class="spinner"></span>Transcription lag <span id='timeInfo'><span class="lag-transcription-value">${fmt1(
+                            remaining_time_transcription
+                        )}</span>s</span></span>`;
+                    }
+                    if (buffer_diarization && remaining_time_diarization > 0) {
+                        speakerLabel += `<span class="label_diarization"><span class="spinner"></span>Diarization lag<span id='timeInfo'><span class="lag-diarization-value">${fmt1(
+                            remaining_time_diarization
+                        )}</span>s</span></span>`;
+                    }
+                }
 
-        if (buffer_diarization) {
-          if (isFinalizing) {
-            currentLineText +=
-              (currentLineText.length > 0 && buffer_diarization.trim().length > 0 ? " " : "") + buffer_diarization.trim();
-          } else {
-            currentLineText += `<span class="buffer_diarization">${buffer_diarization}</span>`;
-          }
-        }
-        if (buffer_transcription) {
-          if (isFinalizing) {
-            currentLineText +=
-              (currentLineText.length > 0 && buffer_transcription.trim().length > 0 ? " " : "") +
-              buffer_transcription.trim();
-          } else {
-            currentLineText += `<span class="buffer_transcription">${buffer_transcription}</span>`;
-          }
-        }
-      }
-      
-      if (item.translation) {
-        currentLineText += `
+                if (buffer_diarization) {
+                    if (isFinalizing) {
+                        currentLineText +=
+                            (currentLineText.length > 0 && buffer_diarization.trim().length > 0 ? " " : "") + buffer_diarization.trim();
+                    } else {
+                        currentLineText += `<span class="buffer_diarization">${buffer_diarization}</span>`;
+                    }
+                }
+                if (buffer_transcription) {
+                    if (isFinalizing) {
+                        currentLineText +=
+                            (currentLineText.length > 0 && buffer_transcription.trim().length > 0 ? " " : "") +
+                            buffer_transcription.trim();
+                    } else {
+                        currentLineText += `<span class="buffer_transcription">${buffer_transcription}</span>`;
+                    }
+                }
+            }
+
+            if (item.translation) {
+                currentLineText += `
             <div>
                 <div class="label_translation">
                     ${translationIcon}
                     <span>${item.translation}</span>
                 </div>
             </div>`;
-      }
+            }
 
-      return currentLineText.trim().length > 0 || speakerLabel.length > 0
-        ? `<p>${speakerLabel}<br/><div class='textcontent'>${currentLineText}</div></p>`
-        : `<p>${speakerLabel}<br/></p>`;
-    })
-    .join("");
+            return currentLineText.trim().length > 0 || speakerLabel.length > 0
+                ? `<p>${speakerLabel}<br/><div class='textcontent'>${currentLineText}</div></p>`
+                : `<p>${speakerLabel}<br/></p>`;
+        })
+        .join("");
 
-  linesTranscriptDiv.innerHTML = linesHtml;
-  const transcriptContainer = document.querySelector('.transcript-container');
-  if (transcriptContainer) {
-    transcriptContainer.scrollTo({ top: transcriptContainer.scrollHeight, behavior: "smooth" });
-  }
+    linesTranscriptDiv.innerHTML = linesHtml;
+    const transcriptContainer = document.querySelector('.transcript-container');
+    if (transcriptContainer) {
+        transcriptContainer.scrollTo({top: transcriptContainer.scrollHeight, behavior: "smooth"});
+    }
 }
 
 function updateTimer() {
-  if (!startTime) return;
+    if (!startTime) return;
 
-  const elapsed = Math.floor((Date.now() - startTime) / 1000);
-  const minutes = Math.floor(elapsed / 60).toString().padStart(2, "0");
-  const seconds = (elapsed % 60).toString().padStart(2, "0");
-  timerElement.textContent = `${minutes}:${seconds}`;
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const minutes = Math.floor(elapsed / 60).toString().padStart(2, "0");
+    const seconds = (elapsed % 60).toString().padStart(2, "0");
+    timerElement.textContent = `${minutes}:${seconds}`;
 }
 
 function drawWaveform() {
-  if (!analyser) return;
+    if (!analyser) return;
 
-  const bufferLength = analyser.frequencyBinCount;
-  const dataArray = new Uint8Array(bufferLength);
-  analyser.getByteTimeDomainData(dataArray);
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    analyser.getByteTimeDomainData(dataArray);
 
-  waveCtx.clearRect(
-    0,
-    0,
-    waveCanvas.width / (window.devicePixelRatio || 1),
-    waveCanvas.height / (window.devicePixelRatio || 1)
-  );
-  waveCtx.lineWidth = 1;
-  waveCtx.strokeStyle = waveStroke;
-  waveCtx.beginPath();
+    waveCtx.clearRect(
+        0,
+        0,
+        waveCanvas.width / (window.devicePixelRatio || 1),
+        waveCanvas.height / (window.devicePixelRatio || 1)
+    );
+    waveCtx.lineWidth = 1;
+    waveCtx.strokeStyle = waveStroke;
+    waveCtx.beginPath();
 
-  const sliceWidth = (waveCanvas.width / (window.devicePixelRatio || 1)) / bufferLength;
-  let x = 0;
+    const sliceWidth = (waveCanvas.width / (window.devicePixelRatio || 1)) / bufferLength;
+    let x = 0;
 
-  for (let i = 0; i < bufferLength; i++) {
-    const v = dataArray[i] / 128.0;
-    const y = (v * (waveCanvas.height / (window.devicePixelRatio || 1))) / 2;
+    for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = (v * (waveCanvas.height / (window.devicePixelRatio || 1))) / 2;
 
-    if (i === 0) {
-      waveCtx.moveTo(x, y);
-    } else {
-      waveCtx.lineTo(x, y);
+        if (i === 0) {
+            waveCtx.moveTo(x, y);
+        } else {
+            waveCtx.lineTo(x, y);
+        }
+
+        x += sliceWidth;
     }
 
-    x += sliceWidth;
-  }
+    waveCtx.lineTo(
+        waveCanvas.width / (window.devicePixelRatio || 1),
+        (waveCanvas.height / (window.devicePixelRatio || 1)) / 2
+    );
+    waveCtx.stroke();
 
-  waveCtx.lineTo(
-    waveCanvas.width / (window.devicePixelRatio || 1),
-    (waveCanvas.height / (window.devicePixelRatio || 1)) / 2
-  );
-  waveCtx.stroke();
-
-  animationFrame = requestAnimationFrame(drawWaveform);
+    animationFrame = requestAnimationFrame(drawWaveform);
 }
 
 async function startRecording() {
-  try {
     try {
-      wakeLock = await navigator.wakeLock.request("screen");
-    } catch (err) {
-      console.log("Error acquiring wake lock.");
-    }
-
-    let stream;
-    
-    // chromium extension. in the future, both chrome page audio and mic will be used
-    if (isExtension) {
-      try {
-        stream = await new Promise((resolve, reject) => {
-          chrome.tabCapture.capture({audio: true}, (s) => {
-            if (s) {
-              resolve(s);
-            } else {
-              reject(new Error('Tab capture failed or not available'));
-            }
-          });
-        });
-        
         try {
-          outputAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-          audioSource = outputAudioContext.createMediaStreamSource(stream);
-          audioSource.connect(outputAudioContext.destination);
-        } catch (audioError) {
-          console.warn('could not preserve system audio:', audioError);
+            wakeLock = await navigator.wakeLock.request("screen");
+        } catch (err) {
+            console.log("Error acquiring wake lock.");
         }
-        
-        statusText.textContent = "Using tab audio capture.";
-      } catch (tabError) {
-        console.log('Tab capture not available, falling back to microphone', tabError);
-        const audioConstraints = selectedMicrophoneId
-          ? { audio: { deviceId: { exact: selectedMicrophoneId } } }
-          : { audio: true };
-        stream = await navigator.mediaDevices.getUserMedia(audioConstraints);
-        statusText.textContent = "Using microphone audio.";
-      }
-    } else if (isWebContext) {
-      const audioConstraints = selectedMicrophoneId 
-        ? { audio: { deviceId: { exact: selectedMicrophoneId } } }
-        : { audio: true };
-      stream = await navigator.mediaDevices.getUserMedia(audioConstraints);
-    }
 
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = audioContext.createAnalyser();
-    analyser.fftSize = 256;
-    microphone = audioContext.createMediaStreamSource(stream);
-    microphone.connect(analyser);
+        let stream;
 
-    if (serverUseAudioWorklet) {
-      if (!audioContext.audioWorklet) {
-        throw new Error("AudioWorklet is not supported in this browser");
-      }
-      await audioContext.audioWorklet.addModule("/web/pcm_worklet.js");
-      workletNode = new AudioWorkletNode(audioContext, "pcm-forwarder", { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 1 });
-      microphone.connect(workletNode);
+        // chromium extension. in the future, both chrome page audio and mic will be used
+        if (isExtension) {
+            try {
+                stream = await new Promise((resolve, reject) => {
+                    chrome.tabCapture.capture({audio: true}, (s) => {
+                        if (s) {
+                            resolve(s);
+                        } else {
+                            reject(new Error('Tab capture failed or not available'));
+                        }
+                    });
+                });
 
-      recorderWorker = new Worker("/web/recorder_worker.js");
-      recorderWorker.postMessage({
-        command: "init",
-        config: {
-          sampleRate: audioContext.sampleRate,
-        },
-      });
+                try {
+                    outputAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    audioSource = outputAudioContext.createMediaStreamSource(stream);
+                    audioSource.connect(outputAudioContext.destination);
+                } catch (audioError) {
+                    console.warn('could not preserve system audio:', audioError);
+                }
 
-      recorderWorker.onmessage = (e) => {
-        if (websocket && websocket.readyState === WebSocket.OPEN) {
-          websocket.send(e.data.buffer);
+                statusText.textContent = "Using tab audio capture.";
+            } catch (tabError) {
+                console.log('Tab capture not available, falling back to microphone', tabError);
+                const audioConstraints = selectedMicrophoneId
+                    ? {audio: {deviceId: {exact: selectedMicrophoneId}}}
+                    : {audio: true};
+                stream = await navigator.mediaDevices.getUserMedia(audioConstraints);
+                statusText.textContent = "Using microphone audio.";
+            }
+        } else if (isWebContext) {
+            const audioConstraints = selectedMicrophoneId
+                ? {audio: {deviceId: {exact: selectedMicrophoneId}}}
+                : {audio: true};
+            stream = await navigator.mediaDevices.getUserMedia(audioConstraints);
         }
-      };
 
-      workletNode.port.onmessage = (e) => {
-        const data = e.data;
-        const ab = data instanceof ArrayBuffer ? data : data.buffer;
-        recorderWorker.postMessage(
-          {
-            command: "record",
-            buffer: ab,
-          },
-          [ab]
-        );
-      };
-    } else {
-      try {
-        recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-      } catch (e) {
-        recorder = new MediaRecorder(stream);
-      }
-      recorder.ondataavailable = (e) => {
-        if (websocket && websocket.readyState === WebSocket.OPEN) {
-          if (e.data && e.data.size > 0) {
-            websocket.send(e.data);
-          }
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyser);
+
+        if (serverUseAudioWorklet) {
+            if (!audioContext.audioWorklet) {
+                throw new Error("AudioWorklet is not supported in this browser");
+            }
+            await audioContext.audioWorklet.addModule("/web/pcm_worklet.js");
+            workletNode = new AudioWorkletNode(audioContext, "pcm-forwarder", {
+                numberOfInputs: 1,
+                numberOfOutputs: 0,
+                channelCount: 1
+            });
+            microphone.connect(workletNode);
+
+            recorderWorker = new Worker("/web/recorder_worker.js");
+            recorderWorker.postMessage({
+                command: "init",
+                config: {
+                    sampleRate: audioContext.sampleRate,
+                },
+            });
+
+            recorderWorker.onmessage = (e) => {
+                if (websocket && websocket.readyState === WebSocket.OPEN) {
+                    websocket.send(e.data.buffer);
+                }
+            };
+
+            workletNode.port.onmessage = (e) => {
+                const data = e.data;
+                const ab = data instanceof ArrayBuffer ? data : data.buffer;
+                recorderWorker.postMessage(
+                    {
+                        command: "record",
+                        buffer: ab,
+                    },
+                    [ab]
+                );
+            };
+        } else {
+            try {
+                recorder = new MediaRecorder(stream, {mimeType: "audio/webm"});
+            } catch (e) {
+                recorder = new MediaRecorder(stream);
+            }
+            recorder.ondataavailable = (e) => {
+                if (websocket && websocket.readyState === WebSocket.OPEN) {
+                    if (e.data && e.data.size > 0) {
+                        websocket.send(e.data);
+                    }
+                }
+            };
+            recorder.start(chunkDuration);
         }
-      };
-      recorder.start(chunkDuration);
-    }
 
-    startTime = Date.now();
-    timerInterval = setInterval(updateTimer, 1000);
-    drawWaveform();
+        startTime = Date.now();
+        timerInterval = setInterval(updateTimer, 1000);
+        drawWaveform();
 
-    isRecording = true;
-    updateUI();
-  } catch (err) {
-    if (window.location.hostname === "0.0.0.0") {
-      statusText.textContent =
-        "Error accessing microphone. Browsers may block microphone access on 0.0.0.0. Try using localhost:8000 instead.";
-    } else {
-      statusText.textContent = "Error accessing microphone. Please allow microphone access.";
+        isRecording = true;
+        updateUI();
+    } catch (err) {
+        if (window.location.hostname === "0.0.0.0") {
+            statusText.textContent =
+                "Error accessing microphone. Browsers may block microphone access on 0.0.0.0. Try using localhost:8000 instead.";
+        } else {
+            statusText.textContent = "Error accessing microphone. Please allow microphone access.";
+        }
+        console.error(err);
     }
-    console.error(err);
-  }
 }
 
 async function stopRecording() {
-  if (wakeLock) {
-    try {
-      await wakeLock.release();
-    } catch (e) {
-      // ignore
+    if (wakeLock) {
+        try {
+            await wakeLock.release();
+        } catch (e) {
+            // ignore
+        }
+        wakeLock = null;
     }
-    wakeLock = null;
-  }
 
-  userClosing = true;
-  waitingForStop = true;
+    userClosing = true;
+    waitingForStop = true;
 
-  if (websocket && websocket.readyState === WebSocket.OPEN) {
-    const emptyBlob = new Blob([], { type: "audio/webm" });
-    websocket.send(emptyBlob);
-    statusText.textContent = "Recording stopped. Processing final audio...";
-  }
-
-  if (recorder) {
-    try {
-      recorder.stop();
-    } catch (e) {
+    if (websocket && websocket.readyState === WebSocket.OPEN) {
+        const emptyBlob = new Blob([], {type: "audio/webm"});
+        websocket.send(emptyBlob);
+        statusText.textContent = "Recording stopped. Processing final audio...";
     }
-    recorder = null;
-  }
 
-  if (recorderWorker) {
-    recorderWorker.terminate();
-    recorderWorker = null;
-  }
-  
-  if (workletNode) {
-    try {
-      workletNode.port.onmessage = null;
-    } catch (e) {}
-    try {
-      workletNode.disconnect();
-    } catch (e) {}
-    workletNode = null;
-  }
-
-  if (microphone) {
-    microphone.disconnect();
-    microphone = null;
-  }
-
-  if (analyser) {
-    analyser = null;
-  }
-
-  if (audioContext && audioContext.state !== "closed") {
-    try {
-      await audioContext.close();
-    } catch (e) {
-      console.warn("Could not close audio context:", e);
+    if (recorder) {
+        try {
+            recorder.stop();
+        } catch (e) {
+        }
+        recorder = null;
     }
-    audioContext = null;
-  }
 
-  if (audioSource) {
-    audioSource.disconnect();
-    audioSource = null;
-  }
+    if (recorderWorker) {
+        recorderWorker.terminate();
+        recorderWorker = null;
+    }
 
-  if (outputAudioContext && outputAudioContext.state !== "closed") {
-    outputAudioContext.close()
-    outputAudioContext = null;
-  }
+    if (workletNode) {
+        try {
+            workletNode.port.onmessage = null;
+        } catch (e) {
+        }
+        try {
+            workletNode.disconnect();
+        } catch (e) {
+        }
+        workletNode = null;
+    }
 
-  if (animationFrame) {
-    cancelAnimationFrame(animationFrame);
-    animationFrame = null;
-  }
+    if (microphone) {
+        microphone.disconnect();
+        microphone = null;
+    }
 
-  if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-  }
-  timerElement.textContent = "00:00";
-  startTime = null;
+    if (analyser) {
+        analyser = null;
+    }
 
-  isRecording = false;
-  updateUI();
+    if (audioContext && audioContext.state !== "closed") {
+        try {
+            await audioContext.close();
+        } catch (e) {
+            console.warn("Could not close audio context:", e);
+        }
+        audioContext = null;
+    }
+
+    if (audioSource) {
+        audioSource.disconnect();
+        audioSource = null;
+    }
+
+    if (outputAudioContext && outputAudioContext.state !== "closed") {
+        outputAudioContext.close()
+        outputAudioContext = null;
+    }
+
+    if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+        animationFrame = null;
+    }
+
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+    timerElement.textContent = "00:00";
+    startTime = null;
+
+    isRecording = false;
+    updateUI();
 }
 
 async function toggleRecording() {
-  if (!isRecording) {
-    if (waitingForStop) {
-      console.log("Waiting for stop, early return");
-      return;
+    if (!isRecording) {
+        if (waitingForStop) {
+            console.log("Waiting for stop, early return");
+            return;
+        }
+        console.log("Connecting to WebSocket");
+        try {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                await configReady;
+                await startRecording();
+            } else {
+                await setupWebSocket();
+                await configReady;
+                await startRecording();
+            }
+        } catch (err) {
+            statusText.textContent = "Could not connect to WebSocket or access mic. Aborted.";
+            console.error(err);
+        }
+    } else {
+        console.log("Stopping recording");
+        stopRecording();
     }
-    console.log("Connecting to WebSocket");
-    try {
-      if (websocket && websocket.readyState === WebSocket.OPEN) {
-        await configReady;
-        await startRecording();
-      } else {
-        await setupWebSocket();
-        await configReady;
-        await startRecording();
-      }
-    } catch (err) {
-      statusText.textContent = "Could not connect to WebSocket or access mic. Aborted.";
-      console.error(err);
-    }
-  } else {
-    console.log("Stopping recording");
-    stopRecording();
-  }
 }
 
 function updateUI() {
-  recordButton.classList.toggle("recording", isRecording);
-  recordButton.disabled = waitingForStop;
+    recordButton.classList.toggle("recording", isRecording);
+    recordButton.disabled = waitingForStop;
 
-  if (waitingForStop) {
-    if (statusText.textContent !== "Recording stopped. Processing final audio...") {
-      statusText.textContent = "Please wait for processing to complete...";
+    if (waitingForStop) {
+        if (statusText.textContent !== "Recording stopped. Processing final audio...") {
+            statusText.textContent = "Please wait for processing to complete...";
+        }
+    } else if (isRecording) {
+        statusText.textContent = "";
+    } else {
+        if (
+            statusText.textContent !== "Finished processing audio! Ready to record again." &&
+            statusText.textContent !== "Processing finalized or connection closed."
+        ) {
+            statusText.textContent = "Click to start transcription";
+        }
     }
-  } else if (isRecording) {
-    statusText.textContent = "";
-  } else {
-    if (
-      statusText.textContent !== "Finished processing audio! Ready to record again." &&
-      statusText.textContent !== "Processing finalized or connection closed."
-    ) {
-      statusText.textContent = "Click to start transcription";
+    if (!waitingForStop) {
+        recordButton.disabled = false;
     }
-  }
-  if (!waitingForStop) {
-    recordButton.disabled = false;
-  }
 }
 
 recordButton.addEventListener("click", toggleRecording);
 
 if (microphoneSelect) {
-  microphoneSelect.addEventListener("change", handleMicrophoneChange);
+    microphoneSelect.addEventListener("change", handleMicrophoneChange);
+}
+if (languageSelect) {
+    languageSelect.addEventListener("change", handleLanguageChange);
 }
 document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    await enumerateMicrophones();
-  } catch (error) {
-    console.log("Could not enumerate microphones on load:", error);
-  }
+    try {
+        await enumerateMicrophones();
+        populateLanguageSelect();
+    } catch (error) {
+        console.log("Could not enumerate microphones on load:", error);
+    }
 });
 navigator.mediaDevices.addEventListener('devicechange', async () => {
-  console.log('Device change detected, re-enumerating microphones');
-  try {
-    await enumerateMicrophones();
-  } catch (error) {
-    console.log("Error re-enumerating microphones:", error);
-  }
+    console.log('Device change detected, re-enumerating microphones');
+    try {
+        await enumerateMicrophones();
+    } catch (error) {
+        console.log("Error re-enumerating microphones:", error);
+    }
 });
 
 
 settingsToggle.addEventListener("click", () => {
-settingsDiv.classList.toggle("visible");
-settingsToggle.classList.toggle("active");
+    settingsDiv.classList.toggle("visible");
+    settingsToggle.classList.toggle("active");
 });
 
 if (isExtension) {
-  async function checkAndRequestPermissions() {
-    const micPermission = await navigator.permissions.query({
-      name: "microphone",
-    });
+    async function checkAndRequestPermissions() {
+        const micPermission = await navigator.permissions.query({
+            name: "microphone",
+        });
 
-    const permissionDisplay = document.getElementById("audioPermission");
-    if (permissionDisplay) {
-      permissionDisplay.innerText = `MICROPHONE: ${micPermission.state}`;
+        const permissionDisplay = document.getElementById("audioPermission");
+        if (permissionDisplay) {
+            permissionDisplay.innerText = `MICROPHONE: ${micPermission.state}`;
+        }
+
+        // if (micPermission.state !== "granted") {
+        //   chrome.tabs.create({ url: "welcome.html" });
+        // }
+
+        const intervalId = setInterval(async () => {
+            const micPermission = await navigator.permissions.query({
+                name: "microphone",
+            });
+            if (micPermission.state === "granted") {
+                if (permissionDisplay) {
+                    permissionDisplay.innerText = `MICROPHONE: ${micPermission.state}`;
+                }
+                clearInterval(intervalId);
+            }
+        }, 100);
     }
 
-    // if (micPermission.state !== "granted") {
-    //   chrome.tabs.create({ url: "welcome.html" });
-    // }
-
-    const intervalId = setInterval(async () => {
-      const micPermission = await navigator.permissions.query({
-        name: "microphone",
-      });
-      if (micPermission.state === "granted") {
-        if (permissionDisplay) {
-          permissionDisplay.innerText = `MICROPHONE: ${micPermission.state}`;
-        }
-        clearInterval(intervalId);
-      }
-    }, 100);
-  }
-
-  void checkAndRequestPermissions();
+    void checkAndRequestPermissions();
 }

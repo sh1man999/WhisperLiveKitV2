@@ -284,7 +284,8 @@ body {
 #chunkSelector,
 #websocketInput,
 #themeSelector,
-#microphoneSelect {
+#microphoneSelect,
+#languageSelect {
   font-size: 16px;
   padding: 5px 8px;
   border-radius: 8px;
@@ -294,7 +295,8 @@ body {
   max-height: 30px;
 }
 
-#microphoneSelect {
+#microphoneSelect,
+#languageSelect {
   width: 100%;
   max-width: 190px;
   min-width: 120px;
@@ -303,7 +305,8 @@ body {
 #chunkSelector:focus,
 #websocketInput:focus,
 #themeSelector:focus,
-#microphoneSelect:focus {
+#microphoneSelect:focus,
+#languageSelect:focus {
   outline: none;
   border-color: #007bff;
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
