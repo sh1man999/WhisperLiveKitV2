@@ -1,11 +1,56 @@
 import logging
+import re
+from typing import Final
+
 from whisperlivekit.remove_silences import handle_silences
 from whisperlivekit.timed_objects import Line, format_time
 
 logger = logging.getLogger(__name__)
+# Уникальный маркер для временной замены точек в исключениях (сокращениях)
+_TEMP_DOT_MARKER: Final[str] = "_TEMP_DOT_MARKER_"
+# Словарь для замены точек в сокращениях на временный маркер.
+_ABBREVIATION_REPLACE_DICT: Final[dict[str, str]] = {
+    "и т.д.": f"и т{_TEMP_DOT_MARKER}д",
+    "и т.п.": f"и т{_TEMP_DOT_MARKER}п",
+    "т.е.": f"т{_TEMP_DOT_MARKER}е",
+    "т.н.": f"т{_TEMP_DOT_MARKER}н",
+    "Т.е.": f"Т{_TEMP_DOT_MARKER}е",
+    "Т.н.": f"Т{_TEMP_DOT_MARKER}н",
+    "и т. д.": f"и т{_TEMP_DOT_MARKER} д",
+    "и т. п.": f"и т{_TEMP_DOT_MARKER} п",
+    "т. е.": f"т{_TEMP_DOT_MARKER} е",
+    "т. н.": f"т{_TEMP_DOT_MARKER} н",
+    "Т. е.": f"Т{_TEMP_DOT_MARKER} е",
+    "Т. н.": f"Т{_TEMP_DOT_MARKER} н",
+}
+# Словарь для восстановления оригинальных точек в сокращениях.
+_ABBREVIATION_RESTORE_DICT: Final[dict[str, str]] = {
+    value: key for key, value in _ABBREVIATION_REPLACE_DICT.items()
+}
+# Скомпилированное регулярное выражение для поиска букв, которые нужно сделать заглавными.
+_CAPITALIZE_PATTERN = re.compile(r"([.!?]\s*|[.!?]\n\[.*?\]\s*)([a-zа-я])")
+_CHECK_AROUND = 4
+_DEBUG = False
 
-CHECK_AROUND = 4
-DEBUG = False
+def capitalize_after_delimiters(text: str) -> str:
+    if not text:  # Обработка пустой строки
+        return ""
+
+    # 1. Защита точек в известных сокращениях путем замены на временный маркер
+    for original_abbr, marked_abbr in _ABBREVIATION_REPLACE_DICT.items():
+        text = text.replace(original_abbr, marked_abbr)
+
+    # 2. Применение капитализации после разделителей предложений
+    # _CAPITALIZE_PATTERN находит фразу-разделитель (группа 1)
+    # и следующую за ней строчную букву (группа 2).
+    # лямбда затем заменяет это совпадение, делая букву заглавной.
+    text = _CAPITALIZE_PATTERN.sub(lambda m: m.group(1) + m.group(2).upper(), text)
+
+    # 3. Восстановление оригинальных точек в сокращениях
+    for marked_abbr, original_abbr in _ABBREVIATION_RESTORE_DICT.items():
+        text = text.replace(marked_abbr, original_abbr)
+
+    return text
 
 
 def is_punctuation(token):
@@ -14,13 +59,13 @@ def is_punctuation(token):
     return False
 
 def next_punctuation_change(i, tokens):
-    for ind in range(i+1, min(len(tokens), i+CHECK_AROUND+1)):
+    for ind in range(i+1, min(len(tokens), i + _CHECK_AROUND + 1)):
         if is_punctuation(tokens[ind]):
             return ind
     return None
 
 def next_speaker_change(i, tokens, speaker):
-    for ind in range(i-1, max(0, i-CHECK_AROUND)-1, -1):
+    for ind in range(i-1, max(0, i - _CHECK_AROUND) - 1, -1):
         token = tokens[ind]
         if is_punctuation(token):
             break
@@ -33,7 +78,7 @@ def new_line(
 ):
     return Line(
         speaker = token.corrected_speaker,
-        text = token.text + (f"[{format_time(token.start)} : {format_time(token.end)}]" if DEBUG else ""),
+        text = token.text + (f"[{format_time(token.start)} : {format_time(token.end)}]" if _DEBUG else ""),
         start = token.start,
         end = token.end,
         detected_language=token.detected_language
@@ -44,7 +89,7 @@ def append_token_to_last_line(lines, sep, token):
         lines.append(new_line(token))
     else:
         if token.text:
-            lines[-1].text += sep + token.text + (f"[{format_time(token.start)} : {format_time(token.end)}]" if DEBUG else "")
+            lines[-1].text += sep + token.text + (f"[{format_time(token.start)} : {format_time(token.end)}]" if _DEBUG else "")
             lines[-1].end = token.end
         if not lines[-1].detected_language and token.detected_language:
             lines[-1].detected_language = token.detected_language
@@ -113,12 +158,34 @@ def format_output(state, silence, current_time, args, sep):
 
     lines = []
     for token in tokens:
-        if int(token.corrected_speaker) != int(previous_speaker):
+        split_now = False
+        if getattr(args, 'split_on_punctuation_for_display', False) and lines:
+            last_line_text = lines[-1].text.strip()
+            if last_line_text:
+                if last_line_text.endswith((".", "?", "!")):
+                    split_now = True
+                elif last_line_text.endswith(","):
+                    words_in_line = len(lines[-1].text.split())
+                    if len(tokens) > 15 and words_in_line >= 6:
+                        split_now = True
+
+        if split_now or (lines and int(token.corrected_speaker) != int(previous_speaker)):
             lines.append(new_line(token))
         else:
             append_token_to_last_line(lines, sep, token)
 
         previous_speaker = token.corrected_speaker
+
+
+    for line in lines:
+        # Capitalize the very first letter
+        stripped_text = line.text.lstrip()
+        if stripped_text:
+            capitalized_text = stripped_text[0].upper() + stripped_text[1:]
+            line.text = line.text[:len(line.text) - len(stripped_text)] + capitalized_text
+
+        # Then apply the user's logic for subsequent sentences
+        line.text = capitalize_after_delimiters(line.text)
 
     if state.buffer_transcription and lines:
         lines[-1].end = max(state.buffer_transcription.end, lines[-1].end)

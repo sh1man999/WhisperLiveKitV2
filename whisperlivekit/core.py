@@ -12,6 +12,7 @@ class TranscriptionEngine:
     def __init__(self,
                  is_diarization: bool=False,
                  punctuation_split: bool=False,
+                 split_on_punctuation_for_display: bool=False,
                  vac: bool=True,
                  vac_chunk_size: float=0.04,
                  log_level: str= "DEBUG",
@@ -39,6 +40,7 @@ class TranscriptionEngine:
         self.args = Namespace(
             diarization=is_diarization,
             punctuation_split=punctuation_split,
+            split_on_punctuation_for_display=split_on_punctuation_for_display,
             vac=vac,
             vac_chunk_size=vac_chunk_size,
             log_level=log_level,

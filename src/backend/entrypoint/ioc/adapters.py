@@ -31,11 +31,12 @@ class TranscriptionProvider(Provider):
             model_cache_dir=config.whisper.models_path,
             is_diarization=config.diarization,
             embedding_model_name=config.pyannote.embedding_model,
-            lan="ru", # default
+            lan="ru",  # default
             segmentation_model_name=config.pyannote.segmentation_model,
             diarization_backend="diart",
             device=config.whisper.device,
             device_index=config.whisper.cuda_device_index,
             cpu_threads=config.whisper.cpu_threads,
-            num_workers=config.whisper.num_workers
+            num_workers=config.whisper.num_workers,
+            split_on_punctuation_for_display=True, # Разбивает на строки при обнаружении знаков препинаний
         )
