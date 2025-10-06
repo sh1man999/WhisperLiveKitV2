@@ -43,6 +43,10 @@ class TimedText:
 
 @dataclass()
 class ASRToken(TimedText):
+    corrected_speaker: Optional[int] = -1
+    validated_speaker: bool = False
+    validated_text: bool = False
+    validated_language: bool = False
     def with_offset(self, offset: float) -> "ASRToken":
         """Return a new token with the time offset added."""
         return ASRToken(self.start + offset, self.end + offset, self.text, self.speaker, self.probability, detected_language=self.detected_language)
@@ -169,6 +173,7 @@ class ChangeSpeaker:
 @dataclass  
 class State:
     tokens: list
+    last_validated_token: int
     buffer_transcription: str | Transcript
     end_buffer: float
     end_attributed_speaker: float

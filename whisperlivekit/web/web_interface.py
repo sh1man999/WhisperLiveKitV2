@@ -22,7 +22,37 @@ def get_inline_ui_html():
             css_content = f.read()
         with resources.files('whisperlivekit.web').joinpath('live_transcription.js').open('r', encoding='utf-8') as f:
             js_content = f.read()
-        
+
+        with (
+            resources.files("whisperlivekit.web")
+            .joinpath("pcm_worklet.js")
+            .open("r", encoding="utf-8") as f
+        ):
+            worklet_code = f.read()
+        with (
+            resources.files("whisperlivekit.web")
+            .joinpath("recorder_worker.js")
+            .open("r", encoding="utf-8") as f
+        ):
+            worker_code = f.read()
+
+        js_content = js_content.replace(
+            'await audioContext.audioWorklet.addModule("/web/pcm_worklet.js");',
+            "const workletBlob = new Blob([`"
+            + worklet_code
+            + '`], { type: "application/javascript" });\n'
+            + "const workletUrl = URL.createObjectURL(workletBlob);\n"
+            + "await audioContext.audioWorklet.addModule(workletUrl);",
+        )
+        js_content = js_content.replace(
+            'recorderWorker = new Worker("/web/recorder_worker.js");',
+            "const workerBlob = new Blob([`"
+            + worker_code
+            + '`], { type: "application/javascript" });\n'
+            + "const workerUrl = URL.createObjectURL(workerBlob);\n"
+            + "recorderWorker = new Worker(workerUrl);",
+        )
+
         # SVG files
         with resources.files('whisperlivekit.web').joinpath('src', 'system_mode.svg').open('r', encoding='utf-8') as f:
             system_svg = f.read()

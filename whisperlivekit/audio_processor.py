@@ -62,13 +62,13 @@ class AudioProcessor:
         self.bytes_per_sec = self.samples_per_sec * self.bytes_per_sample
         self.max_bytes_per_sec = 32000 * 5  # 5 seconds of audio at 32 kHz
         self.is_pcm_input = pcm_input
-        self.debug = False
 
         # State management
         self.is_stopping = False
         self.silence = False
         self.silence_duration = 0.0
         self.tokens = []
+        self.last_validated_token = 0
         self.buffer_transcription = Transcript()
         self.end_buffer = 0
         self.end_attributed_speaker = 0
@@ -131,7 +131,7 @@ class AudioProcessor:
     async def add_dummy_token(self):
         """Placeholder token when no transcription is available."""
         async with self.lock:
-            current_time = time() - self.beg_loop if self.beg_loop else 0
+            current_time = time() - self.beg_loop
             self.tokens.append(ASRToken(
                 start=current_time, end=current_time + 1,
                 text=".", speaker=-1, is_dummy=True
@@ -154,11 +154,12 @@ class AudioProcessor:
                 
             return State(
                 tokens=self.tokens.copy(),
+                last_validated_token=self.last_validated_token,
                 buffer_transcription=self.buffer_transcription,
                 end_buffer=self.end_buffer,
                 end_attributed_speaker=self.end_attributed_speaker,
                 remaining_time_transcription=remaining_transcription,
-                remaining_time_diarization=remaining_diarization
+                remaining_time_diarization=remaining_diarization,
             )
             
     async def reset(self):
@@ -319,10 +320,10 @@ class AudioProcessor:
                 # Process diarization
                 # https://github.com/QuentinFuxa/WhisperLiveKit/issues/251
                 await diarization_obj.diarize(pcm_array)
-                segments = diarization_obj.get_segments()
                 if self.diarization_before_transcription:
+                    segments = diarization_obj.get_segments()
                     self.cumulative_pcm.append(pcm_array)
-                    if self.segments:
+                    if segments:
                         last_segment = segments[-1]                    
                         if last_segment.speaker != self.current_speaker:
                             cut_sec = last_segment.start - self.last_end
@@ -363,35 +364,22 @@ class AudioProcessor:
         """Format processing results for output."""
         while True:
             try:
-                # If FFmpeg error occurred, notify front-end
                 if self._ffmpeg_error:
-                    yield FrontData(
-                        status="error",
-                        error=f"FFmpeg error: {self._ffmpeg_error}"
-                    )
+                    yield FrontData(status="error", error=f"FFmpeg error: {self._ffmpeg_error}")
                     self._ffmpeg_error = None
                     await asyncio.sleep(1)
                     continue
 
-                # Get current state
                 state = await self.get_current_state()
-                                
-                # Add dummy tokens if needed
-                if (not state.tokens or state.tokens[-1].is_dummy) and not self.args.transcription and self.args.diarization:
-                    await self.add_dummy_token()
-                    sleep(0.5)
-                    state = await self.get_current_state()
-                
-                # Format output
-                lines, undiarized_text, end_w_silence = format_output(
+
+                lines, undiarized_text = format_output(
                     state,
                     self.silence,
-                    current_time = time() - self.beg_loop if self.beg_loop else None,
-                    args = self.args,
-                    debug = self.debug,
-                    sep=self.sep
+                    current_time=time() - self.beg_loop,
+                    args=self.args,
+                    sep=self.sep,
                 )
-                if end_w_silence:
+                if lines and lines[-1].speaker == -2:
                     buffer_transcription = Transcript()
                 else:
                     buffer_transcription = state.buffer_transcription

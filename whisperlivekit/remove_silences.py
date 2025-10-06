@@ -7,7 +7,7 @@ END_SILENCE_DURATION_VAC = 3 #VAC is good at detecting silences, but we want to 
 
 def blank_to_silence(tokens):
     full_string = ''.join([t.text for t in tokens])
-    patterns = [re.compile(r'(?:\s*\[BLANK_AUDIO\]\s*)+'), re.compile(r'(?:\s*\[typing\]\s*)+')]             
+    patterns = [re.compile(r'(?:\s*\[BLANK_AUDIO\]\s*)+'), re.compile(r'(?:\s*\[typing\]\s*)+')]
     matches = []
     for pattern in patterns:
         for m in pattern.finditer(full_string):
@@ -59,7 +59,7 @@ def no_token_to_silence(tokens):
                 new_tokens[-1].end = token.end
             else:
                 new_tokens.append(token)
-            
+
         last_end = new_tokens[-1].end if new_tokens else 0.0
         if token.start - last_end >= MIN_SILENCE_DURATION: #if token is not silence but important gap
             if new_tokens and new_tokens[-1].speaker == -2:
@@ -70,24 +70,16 @@ def no_token_to_silence(tokens):
                     end=token.start,
                     speaker=-2,
                     probability=0.95
-                    )
+                )
                 new_tokens.append(silence_token)
-        
+
         if token.speaker != -2:
             new_tokens.append(token)
     return new_tokens
-            
+
 def ends_with_silence(tokens, current_time, vac_detected_silence):
-    end_w_silence = False
-    if not tokens:
-        return [], end_w_silence
     last_token = tokens[-1]
-    if tokens and current_time and (
-        current_time - last_token.end >= END_SILENCE_DURATION 
-        or
-        (current_time - last_token.end >= 3 and vac_detected_silence)
-        ):
-        end_w_silence = True
+    if  vac_detected_silence or (current_time - last_token.end >= END_SILENCE_DURATION):
         if last_token.speaker == -2:
             last_token.end = current_time
         else:
@@ -99,12 +91,13 @@ def ends_with_silence(tokens, current_time, vac_detected_silence):
                     probability=0.95
                 )
             )
-    return tokens, end_w_silence
-    
+    return tokens
+
 
 def handle_silences(tokens, current_time, vac_detected_silence):
+    if not tokens:
+        return []
     tokens = blank_to_silence(tokens) #useful for simulstreaming backend which tends to generate [BLANK_AUDIO] text
     tokens = no_token_to_silence(tokens)
-    tokens, end_w_silence = ends_with_silence(tokens, current_time, vac_detected_silence)
-    return tokens, end_w_silence
-     
+    tokens = ends_with_silence(tokens, current_time, vac_detected_silence)
+    return tokens
