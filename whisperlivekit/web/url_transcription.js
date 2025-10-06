@@ -2,7 +2,6 @@ const isExtension = typeof chrome !== 'undefined' && chrome.runtime && chrome.ru
 if (isExtension) {
     document.documentElement.classList.add('is-extension');
 }
-const isWebContext = !isExtension;
 
 let isTranscribing = false;
 let websocket = null;
