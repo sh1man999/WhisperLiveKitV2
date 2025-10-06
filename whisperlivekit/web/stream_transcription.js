@@ -118,7 +118,8 @@ const LANGUAGES = {
 };
 
 const statusText = document.getElementById("status");
-const transcribeButton = document.getElementById("transcribeButton");
+const startButton = document.getElementById("startButton");
+const stopButton = document.getElementById("stopButton");
 const websocketInput = document.getElementById("websocketInput");
 const urlInput = document.getElementById("urlInput");
 const linesTranscriptDiv = document.getElementById("linesTranscript");
@@ -126,7 +127,6 @@ const timerElement = document.querySelector(".timer");
 const themeRadios = document.querySelectorAll('input[name="theme"]');
 const languageSelect = document.getElementById("languageSelect");
 
-const settingsToggle = document.getElementById("settingsToggle");
 const settingsDiv = document.querySelector(".settings");
 
 const translationIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="12px" viewBox="0 -960 960 960" width="12px" fill="#5f6368"><path d="m603-202-34 97q-4 11-14 18t-22 7q-20 0-32.5-16.5T496-133l152-402q5-11 15-18t22-7h30q12 0 22 7t15 18l152 403q8 19-4 35.5T868-80q-13 0-22.5-7T831-106l-34-96H603ZM362-401 188-228q-11 11-27.5 11.5T132-228q-11-11-11-28t11-28l174-174q-35-35-63.5-80T190-640h84q20 39 40 68t48 58q33-33 68.5-92.5T484-720H80q-17 0-28.5-11.5T40-760q0-17 11.5-28.5T80-800h240v-40q0-17 11.5-28.5T360-880q17 0 28.5 11.5T400-840v40h240q17 0 28.5 11.5T680-760q0 17-11.5 28.5T640-720h-76q-21 72-63 148t-83 116l96 98-30 82-122-125Zm266 129h144l-72-204-72 204Z"/></svg>`
@@ -189,7 +189,7 @@ function handleLanguageChange() {
         statusText.textContent = "Switching language... Please wait.";
         stopTranscription().then(() => {
             setTimeout(() => {
-                toggleTranscription();
+                startTranscription();
             }, 1000);
         });
     }
@@ -304,7 +304,7 @@ function setupWebSocket() {
                     );
                 }
                 statusText.textContent = "Finished processing audio! Ready to transcribe again.";
-                transcribeButton.disabled = false;
+                updateUI();
 
                 if (websocket) {
                     websocket.close();
@@ -472,7 +472,12 @@ function updateTimer() {
 }
 
 async function startTranscription() {
+    if (isTranscribing || waitingForStop) return;
+
+    console.log("Connecting to WebSocket");
     try {
+        await setupWebSocket();
+        
         try {
             wakeLock = await navigator.wakeLock.request("screen");
         } catch (err) {
@@ -485,8 +490,9 @@ async function startTranscription() {
         isTranscribing = true;
         updateUI();
     } catch (err) {
-        statusText.textContent = "Error starting transcription.";
+        statusText.textContent = "Could not connect to WebSocket. Aborted.";
         console.error(err);
+        updateUI(); // Ensure UI is consistent on failure
     }
 }
 
@@ -519,29 +525,9 @@ async function stopTranscription() {
     updateUI();
 }
 
-async function toggleTranscription() {
-    if (!isTranscribing) {
-        if (waitingForStop) {
-            console.log("Waiting for stop, early return");
-            return;
-        }
-        console.log("Connecting to WebSocket");
-        try {
-            await setupWebSocket();
-            await startTranscription();
-        } catch (err) {
-            statusText.textContent = "Could not connect to WebSocket. Aborted.";
-            console.error(err);
-        }
-    } else {
-        console.log("Stopping transcription");
-        stopTranscription();
-    }
-}
-
 function updateUI() {
-    transcribeButton.classList.toggle("recording", isTranscribing);
-    transcribeButton.disabled = waitingForStop;
+    startButton.disabled = isTranscribing || waitingForStop;
+    stopButton.disabled = !isTranscribing || waitingForStop;
 
     if (waitingForStop) {
         if (statusText.textContent !== "Transcription stopped. Processing final audio...") {
@@ -557,21 +543,15 @@ function updateUI() {
             statusText.textContent = "Click to start transcription";
         }
     }
-    if (!waitingForStop) {
-        transcribeButton.disabled = false;
-    }
 }
 
-transcribeButton.addEventListener("click", toggleTranscription);
+startButton.addEventListener("click", startTranscription);
+stopButton.addEventListener("click", stopTranscription);
 
 if (languageSelect) {
     languageSelect.addEventListener("change", handleLanguageChange);
 }
 document.addEventListener('DOMContentLoaded', async () => {
     populateLanguageSelect();
-});
-
-settingsToggle.addEventListener("click", () => {
-    settingsDiv.classList.toggle("visible");
-    settingsToggle.classList.toggle("active");
+    updateUI(); // Set initial button states
 });

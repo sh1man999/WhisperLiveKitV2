@@ -111,7 +111,7 @@ def get_inline_stream_ui_html():
     try:
         with (
             resources.files("whisperlivekit.web")
-            .joinpath("url_transcription.html")
+            .joinpath("stream_transcription.html")
             .open("r", encoding="utf-8") as f
         ):
             html_content = f.read()
