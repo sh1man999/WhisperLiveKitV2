@@ -106,24 +106,24 @@ def get_inline_ui_html():
         return "<html><body><h1>Error loading embedded interface</h1></body></html>"
 
 
-def get_inline_url_ui_html():
+def get_inline_stream_ui_html():
     """Returns the complete web interface HTML with all assets embedded in a single call."""
     try:
         with (
             resources.files("whisperlivekit.web")
-            .joinpath("url_transcription.html")
+            .joinpath("stream_transcription.html")
             .open("r", encoding="utf-8") as f
         ):
             html_content = f.read()
         with (
             resources.files("whisperlivekit.web")
-            .joinpath("url_transcription.css")
+            .joinpath("stream_transcription.css")
             .open("r", encoding="utf-8") as f
         ):
             css_content = f.read()
         with (
             resources.files("whisperlivekit.web")
-            .joinpath("url_transcription.js")
+            .joinpath("stream_transcription.js")
             .open("r", encoding="utf-8") as f
         ):
             js_content = f.read()
@@ -160,12 +160,12 @@ def get_inline_url_ui_html():
 
         # Replace external references
         html_content = html_content.replace(
-            '<link rel="stylesheet" href="url_transcription.css" />',
+            '<link rel="stylesheet" href="stream_transcription.css" />',
             f"<style>\n{css_content}\n</style>",
         )
 
         html_content = html_content.replace(
-            '<script src="url_transcription.js"></script>',
+            '<script src="stream_transcription.js"></script>',
             f"<script>\n{js_content}\n</script>",
         )
 

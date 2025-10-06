@@ -5,28 +5,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WhisperLiveKit - URL Transcription</title>
-    <link rel="stylesheet" href="url_transcription.css" />
+    <link rel="stylesheet" href="stream_transcription.css" />
 </head>
 
 <body>
     <div class="header-container">
         <div class="settings-container">
             <div class="buttons-container">
-                <button id="transcribeButton">
-                    <div class="shape-container">
-                        <div class="shape"></div>
-                    </div>
-                    <div class="recording-info">
-                        <div class="wave-container">
-                            <canvas id="waveCanvas"></canvas>
-                        </div>
-                        <div class="timer">00:00</div>
-                    </div>
-                </button>
-
-                <button id="settingsToggle" class="settings-toggle" title="Show/hide settings">
-                    <img src="web/src/settings.svg" alt="Settings" />
-                </button>
+                <button id="startButton">Start</button>
+                <button id="stopButton">Stop</button>
+                <div class="timer">00:00</div>
             </div>
 
             <div class="settings">
@@ -78,7 +66,7 @@
         <div id="linesTranscript"></div>
     </div>
 
-    <script src="url_transcription.js"></script>
+    <script src="stream_transcription.js"></script>
 </body>
 
 </html>

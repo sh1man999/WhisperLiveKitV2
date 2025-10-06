@@ -32,6 +32,7 @@ const configReady = new Promise((r) => (configReadyResolve = r));
 let outputAudioContext = null;
 let audioSource = null;
 let selectedLanguage = "auto";
+let autoScrollEnabled = true;
 const LANGUAGES = {
     "en": "english",
     "zh": "chinese",
@@ -584,7 +585,7 @@ function renderLinesWithBuffer(
 
     linesTranscriptDiv.innerHTML = linesHtml;
     const transcriptContainer = document.querySelector('.transcript-container');
-    if (transcriptContainer) {
+    if (transcriptContainer && autoScrollEnabled) {
         transcriptContainer.scrollTo({top: transcriptContainer.scrollHeight, behavior: "smooth"});
     }
 }
@@ -914,6 +915,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         populateLanguageSelect();
     } catch (error) {
         console.log("Could not enumerate microphones on load:", error);
+    }
+
+    // Setup autoscroll control
+    const transcriptContainer = document.querySelector('.transcript-container');
+    if (transcriptContainer) {
+        transcriptContainer.addEventListener('scroll', () => {
+            const { scrollTop, scrollHeight, clientHeight } = transcriptContainer;
+            const isScrolledToBottom = scrollHeight - scrollTop - clientHeight < 50;
+
+            if (isScrolledToBottom) {
+                autoScrollEnabled = true;
+            } else {
+                autoScrollEnabled = false;
+            }
+        });
     }
 });
 navigator.mediaDevices.addEventListener('devicechange', async () => {

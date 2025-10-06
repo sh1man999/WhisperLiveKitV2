@@ -5,7 +5,7 @@ from whisperlivekit import get_inline_ui_html
 
 from src.backend.presentation.dto.health_check_dto import HealthCheckResponse
 from src.backend.presentation.endpoints.transcribe import transcribe_router
-from whisperlivekit.web.web_interface import get_inline_url_ui_html
+from whisperlivekit.web.web_interface import get_inline_stream_ui_html
 
 root_router = APIRouter()
 
@@ -35,9 +35,9 @@ def healthcheck() -> HealthCheckResponse:
 async def get():
     return HTMLResponse(get_inline_ui_html())
 
-@root_router.get("/url")
+@root_router.get("/stream")
 async def get_url_page():
-    return HTMLResponse(get_inline_url_ui_html())
+    return HTMLResponse(get_inline_stream_ui_html())
 
 root_sub_routers = (transcribe_router,)
 

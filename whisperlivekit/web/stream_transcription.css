@@ -1,4 +1,3 @@
-
 :root {
   --bg: #ffffff;
   --text: #111111;
@@ -213,51 +212,13 @@ body {
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 12px;
+   border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 12px;
 }
 
 .settings-toggle {
-  width: 40px;
-  height: 40px;
-  border: none;
-  border-radius: 50%;
-  background-color: var(--button-bg);
-  border: 1px solid var(--button-border);
-  cursor: pointer;
   display: none;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.settings-toggle:hover {
-  background-color: var(--chip-bg);
-}
-
-.settings-toggle.active {
-  background-color: var(--chip-bg);
-}
-
-.settings-toggle img {
-  width: 20px;
-  height: 20px;
-}
-
-@media (max-width: 10000px) {
-  .settings-toggle {
-    display: flex;
-  }
-  
-  .settings {
-    display: none;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    padding: 12px;
-  }
-  
-  .settings.visible {
-    display: flex;
-  }
 }
 
 @media (max-width: 600px) {
@@ -627,4 +588,42 @@ label {
   line-height: 1;
   font-weight: 800;
   color: var(--muted);
+}
+
+/* Start and Stop Buttons */
+#startButton, #stopButton {
+  font-size: 16px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--button-border);
+  background-color: var(--button-bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+#startButton:hover, #stopButton:hover {
+  background-color: var(--chip-bg);
+}
+
+#startButton:disabled, #stopButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+#stopButton {
+  background-color: #d13d35; /* Red color for stop */
+  color: #ffffff;
+  border-color: #d13d35;
+}
+
+#stopButton:hover {
+  background-color: #b8362f;
+}
+
+#stopButton:disabled {
+  background-color: #d13d35;
+  color: #ffffff;
+  border-color: #d13d35;
+  opacity: 0.5;
 }

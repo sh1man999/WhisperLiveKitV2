@@ -160,14 +160,15 @@ def format_output(state, silence, current_time, args, sep):
     for token in tokens:
         split_now = False
         if getattr(args, 'split_on_punctuation_for_display', False) and lines:
-            last_line_text = lines[-1].text.strip()
-            if last_line_text:
-                if last_line_text.endswith((".", "?", "!")):
-                    split_now = True
-                elif last_line_text.endswith(","):
-                    words_in_line = len(lines[-1].text.split())
-                    if len(tokens) > 15 and words_in_line >= 6:
+            line_duration = lines[-1].end - lines[-1].start
+            if line_duration > 5:
+                last_line_text = lines[-1].text.strip()
+                if last_line_text:
+                    if last_line_text.endswith((".", "?", "!")):
                         split_now = True
+                    # words_in_line = len(lines[-1].text.split())
+                    # if words_in_line >= 15:
+                    #     split_now = True
 
         if split_now or (lines and int(token.corrected_speaker) != int(previous_speaker)):
             lines.append(new_line(token))
@@ -177,12 +178,20 @@ def format_output(state, silence, current_time, args, sep):
         previous_speaker = token.corrected_speaker
 
 
-    for line in lines:
-        # Capitalize the very first letter
-        stripped_text = line.text.lstrip()
-        if stripped_text:
-            capitalized_text = stripped_text[0].upper() + stripped_text[1:]
-            line.text = line.text[:len(line.text) - len(stripped_text)] + capitalized_text
+    for i, line in enumerate(lines):
+        should_capitalize = False
+        if len(lines) == 1:
+            should_capitalize = True
+        else:
+            prev_text = lines[i-1].text.rstrip()
+            if prev_text and prev_text[-1] in (".", "?", "!"):
+                should_capitalize = True
+        if should_capitalize:
+            # Capitalize the very first letter
+            stripped_text = line.text.lstrip()
+            if stripped_text:
+                capitalized_text = stripped_text[0].upper() + stripped_text[1:]
+                line.text = line.text[:len(line.text) - len(stripped_text)] + capitalized_text
 
         # Then apply the user's logic for subsequent sentences
         line.text = capitalize_after_delimiters(line.text)
