@@ -166,10 +166,9 @@ def format_output(state, silence, current_time, args, sep):
                 if last_line_text:
                     if last_line_text.endswith((".", "?", "!")):
                         split_now = True
-                    elif last_line_text.endswith(","):
-                        words_in_line = len(lines[-1].text.split())
-                        if len(tokens) > 15 and words_in_line >= 6:
-                            split_now = True
+                    words_in_line = len(lines[-1].text.split())
+                    if words_in_line >= 15:
+                        split_now = True
 
         if split_now or (lines and int(token.corrected_speaker) != int(previous_speaker)):
             lines.append(new_line(token))
