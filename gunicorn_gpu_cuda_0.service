@@ -1,0 +1,20 @@
+[Unit]
+Description=Gunicorn instance to serve application
+After=network.target
+
+[Service]
+Restart=always
+User=speech2text
+Group=speech2text
+WorkingDirectory=/home/speech2text/asr_realtime
+Environment="LD_LIBRARY_PATH=/home/speech2text/asr_realtime/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib:/home/speech2text/asr_realtime/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib"
+Environment="WHISPER__CUDA_DEVICE_INDEX=0"
+Environment="PYANNOTE__CUDA_DEVICE_INDEX=0"
+ExecStart=/home/speech2text/asr_realtime/.venv/bin/gunicorn -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:4001 --timeout 43200 'src.backend.run:make_app()'
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

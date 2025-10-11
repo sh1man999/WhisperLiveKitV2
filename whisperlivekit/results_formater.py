@@ -179,12 +179,20 @@ def format_output(state, silence, current_time, args, sep):
         previous_speaker = token.corrected_speaker
 
 
-    for line in lines:
-        # Capitalize the very first letter
-        stripped_text = line.text.lstrip()
-        if stripped_text:
-            capitalized_text = stripped_text[0].upper() + stripped_text[1:]
-            line.text = line.text[:len(line.text) - len(stripped_text)] + capitalized_text
+    for i, line in enumerate(lines):
+        should_capitalize = False
+        if len(lines) == 1:
+            should_capitalize = True
+        else:
+            prev_text = lines[i-1].text.rstrip()
+            if prev_text and prev_text[-1] in (".", "?", "!"):
+                should_capitalize = True
+        if should_capitalize:
+            # Capitalize the very first letter
+            stripped_text = line.text.lstrip()
+            if stripped_text:
+                capitalized_text = stripped_text[0].upper() + stripped_text[1:]
+                line.text = line.text[:len(line.text) - len(stripped_text)] + capitalized_text
 
         # Then apply the user's logic for subsequent sentences
         line.text = capitalize_after_delimiters(line.text)
