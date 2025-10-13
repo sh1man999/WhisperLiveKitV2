@@ -279,10 +279,10 @@ function handleLanguageChange() {
     selectedLanguage = languageSelect.value;
     localStorage.setItem('selectedLanguage', selectedLanguage);
     console.log(`Selected language: ${selectedLanguage}`);
-    statusText.textContent = `Language changed to: ${selectedLanguage}`;
+    statusText.textContent = `Язык изменен на: ${selectedLanguage}`;
 
     if (isRecording) {
-        statusText.textContent = "Switching language... Please wait.";
+        statusText.textContent = "Переключение языка... Пожалуйста подождите.";
         stopRecording().then(() => {
             setTimeout(() => {
                 toggleRecording();
@@ -299,10 +299,10 @@ function handleMicrophoneChange() {
     const deviceName = selectedDevice ? selectedDevice.label : 'Default Microphone';
 
     console.log(`Selected microphone: ${deviceName}`);
-    statusText.textContent = `Microphone changed to: ${deviceName}`;
+    statusText.textContent = `Микрофон изменен на: ${deviceName}`;
 
     if (isRecording) {
-        statusText.textContent = "Switching microphone... Please wait.";
+        statusText.textContent = "Переключение микрофона... Пожалуйста подождите.";
         stopRecording().then(() => {
             setTimeout(() => {
                 toggleRecording();

@@ -182,11 +182,10 @@ function populateLanguageSelect() {
 function handleLanguageChange() {
     selectedLanguage = languageSelect.value;
     localStorage.setItem('selectedLanguage', selectedLanguage);
-    console.log(`Selected language: ${selectedLanguage}`);
-    statusText.textContent = `Language changed to: ${selectedLanguage}`;
+    statusText.textContent = `Язык изменен на: ${selectedLanguage}`;
 
     if (isTranscribing) {
-        statusText.textContent = "Switching language... Please wait.";
+        statusText.textContent = "Переключение языка... Пожалуйста подождите.";
         stopTranscription().then(() => {
             setTimeout(() => {
                 startTranscription();
