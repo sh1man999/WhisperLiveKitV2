@@ -121,7 +121,6 @@ const LANGUAGES = {
 const statusText = document.getElementById("status");
 const startButton = document.getElementById("startButton");
 const stopButton = document.getElementById("stopButton");
-const websocketInput = document.getElementById("websocketInput");
 const urlInput = document.getElementById("urlInput");
 const linesTranscriptDiv = document.getElementById("linesTranscript");
 const timerElement = document.querySelector(".timer");
@@ -210,23 +209,12 @@ if (isExtension) {
     protocol = "ws";
 } else {
     host = window.location.hostname || "localhost";
-    port = window.location.port || 8000;
+    port = window.location.port || (window.location.protocol === "https:" ? "" : 8000);
     protocol = window.location.protocol === "https:" ? "wss" : "ws";
 }
 const defaultWebSocketUrl = `${protocol}://${host}${port ? ":" + port : ""}/asr`;
 
-websocketInput.value = defaultWebSocketUrl;
 websocketUrl = defaultWebSocketUrl;
-
-websocketInput.addEventListener("change", () => {
-    const urlValue = websocketInput.value.trim();
-    if (!urlValue.startsWith("ws://") && !urlValue.startsWith("wss://")) {
-        statusText.textContent = "Invalid WebSocket URL (must start with ws:// or wss://)";
-        return;
-    }
-    websocketUrl = urlValue;
-    statusText.textContent = "WebSocket URL updated. Ready to connect.";
-});
 
 function setupWebSocket() {
     return new Promise((resolve, reject) => {
