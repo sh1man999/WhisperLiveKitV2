@@ -34,7 +34,8 @@ class TranscriptionEngine:
                  confidence_validation: bool= False,
                  buffer_trimming_sec: int= 15,
                  segmentation_model_name: str= "pyannote/segmentation-3.0",
-                 embedding_model_name: str = "pyannote/embedding"
+                 embedding_model_name: str = "pyannote/embedding",
+                 compute_type: str = "float16"
                  ):
 
         self.args = Namespace(
@@ -86,7 +87,8 @@ class TranscriptionEngine:
             device=device,
             device_index=device_index,
             cpu_threads=cpu_threads,
-            num_workers=num_workers
+            num_workers=num_workers,
+            compute_type=compute_type
         )
 
         if is_diarization:

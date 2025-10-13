@@ -66,7 +66,8 @@ def backend_factory(
             device="auto",
             device_index: Union[int, list[int]] = 0,
             cpu_threads: int = 0,
-            num_workers: int = 1
+            num_workers: int = 1,
+            compute_type: str = "float16",
         ):
 
     t = time.time()
@@ -79,7 +80,8 @@ def backend_factory(
         device=device,
         device_index=device_index,
         cpu_threads=cpu_threads,
-        num_workers=num_workers
+        num_workers=num_workers,
+        compute_type=compute_type
     )
     e = time.time()
     logger.info(f"done. It took {round(e - t, 2)} seconds.")
@@ -92,7 +94,7 @@ def backend_factory(
         tokenizer = None
     
     warmup_asr(asr, warmup_file)
-    
+
     asr.confidence_validation = confidence_validation
     asr.tokenizer = tokenizer
     asr.buffer_trimming = buffer_trimming

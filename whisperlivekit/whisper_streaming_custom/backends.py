@@ -29,6 +29,7 @@ class FasterWhisperASR:
         device_index: Union[int, List[int]] = 0,
         cpu_threads: int = 0,
         num_workers: int = 1,
+        compute_type: str = "float16",
     ):
         self.logfile = logfile
         self.transcribe_kargs = {}
@@ -49,7 +50,7 @@ class FasterWhisperASR:
         self.model = WhisperModel(
             model_size_or_path,
             device=device,
-            compute_type="float16",
+            compute_type=compute_type,
             download_root=cache_dir,
             device_index=device_index,
             cpu_threads=cpu_threads,

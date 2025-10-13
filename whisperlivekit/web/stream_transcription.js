@@ -399,7 +399,7 @@ function renderLinesWithBuffer(
                 )}</span> second(s) of audio are undergoing diarization</span></span>`;
             } else if (item.speaker !== 0) {
                 const speakerNum = `<span class="speaker-badge">${item.speaker}</span>`;
-                speakerLabel = `<span id="speaker">${speakerIcon}${speakerNum}</span>`;
+                //speakerLabel = `<span id="speaker">${speakerIcon}${speakerNum}</span>`;
 
                 if (item.detected_language) {
                     speakerLabel += `<span class="label_language">${languageIcon}<span>${item.detected_language}</span></span>`;

@@ -38,5 +38,6 @@ class TranscriptionProvider(Provider):
             device_index=config.whisper.cuda_device_index,
             cpu_threads=config.whisper.cpu_threads,
             num_workers=config.whisper.num_workers,
+            compute_type=config.whisper.compute_type,
             split_on_punctuation_for_display=True, # Разбивает на строки при обнаружении знаков препинаний
         )
