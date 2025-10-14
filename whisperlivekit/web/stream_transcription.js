@@ -220,8 +220,8 @@ function setupWebSocket() {
         try {
             const urlToTranscribe = urlInput.value.trim();
             if (!urlToTranscribe) {
-                statusText.textContent = "Please enter a URL to transcribe.";
-                reject("No URL provided");
+                statusText.textContent = "Пожалуйста, введите URL для транскрипции.";
+                reject("Не указан URL");
                 return;
             }
 
@@ -230,20 +230,20 @@ function setupWebSocket() {
             currentUrl.searchParams.set("url", urlToTranscribe);
             websocket = new WebSocket(currentUrl.toString());
         } catch (error) {
-            statusText.textContent = "Invalid WebSocket URL. Please check and try again.";
+            statusText.textContent = "Неверный WebSocket URL. Пожалуйста, проверьте и попробуйте снова.";
             reject(error);
             return;
         }
 
         websocket.onopen = () => {
-            statusText.textContent = "Connected to server. Transcription started.";
+            statusText.textContent = "Подключено к серверу. Транскрипция запущена.";
             resolve();
         };
 
         websocket.onclose = () => {
             if (userClosing) {
                 if (waitingForStop) {
-                    statusText.textContent = "Processing finalized or connection closed.";
+                    statusText.textContent = "Обработка завершена или соединение закрыто.";
                     if (lastReceivedData) {
                         renderLinesWithBuffer(
                             lastReceivedData.lines || [],
@@ -256,7 +256,7 @@ function setupWebSocket() {
                     }
                 }
             } else {
-                statusText.textContent = "Disconnected from the WebSocket server.";
+                statusText.textContent = "Отключено от WebSocket сервера.";
                 if (isTranscribing) {
                     stopTranscription();
                 }
@@ -270,8 +270,8 @@ function setupWebSocket() {
         };
 
         websocket.onerror = () => {
-            statusText.textContent = "Error connecting to WebSocket.";
-            reject(new Error("Error connecting to WebSocket"));
+            statusText.textContent = "Ошибка подключения к WebSocket.";
+            reject(new Error("Ошибка подключения к WebSocket"));
         };
 
         websocket.onmessage = (event) => {
@@ -291,7 +291,7 @@ function setupWebSocket() {
                         true
                     );
                 }
-                statusText.textContent = "Finished processing audio! Ready to transcribe again.";
+                statusText.textContent = "Обработка аудио завершена! Готов к новой транскрипции.";
                 updateUI();
 
                 if (websocket) {
@@ -335,7 +335,7 @@ function renderLinesWithBuffer(
 ) {
     if (current_status === "no_audio_detected") {
         linesTranscriptDiv.innerHTML =
-            "<p style='text-align: center; color: var(--muted); margin-top: 20px;'><em>No audio detected...</em></p>";
+            "<p style='text-align: center; color: var(--muted); margin-top: 20px;'><em>Аудио не обнаружено...</em></p>";
         return;
     }
 
@@ -383,7 +383,7 @@ function renderLinesWithBuffer(
             } else if (item.speaker == 0 && !isFinalizing) {
                 speakerLabel = `<span class='loading'><span class="spinner"></span><span class="loading-diarization-value">${fmt1(
                     remaining_time_diarization
-                )}</span> second(s) of audio are undergoing diarization</span></span>`;
+                )}</span> сек. аудио обрабатывается диаризацией</span></span>`;
             } else if (item.speaker !== 0) {
                 const speakerNum = `<span class="speaker-badge">${item.speaker}</span>`;
                 //speakerLabel = `<span id="speaker">${speakerIcon}${speakerNum}</span>`;
@@ -398,14 +398,14 @@ function renderLinesWithBuffer(
             if (idx === lines.length - 1) {
                 if (!isFinalizing && item.speaker !== -2) {
                     if (remaining_time_transcription > 0) {
-                        speakerLabel += `<span class="label_transcription"><span class="spinner"></span>Transcription lag <span id='timeInfo'><span class="lag-transcription-value">${fmt1(
+                        speakerLabel += `<span class="label_transcription"><span class="spinner"></span>Задержка транскрипции <span id='timeInfo'><span class="lag-transcription-value">${fmt1(
                             remaining_time_transcription
-                        )}</span>s</span></span>`;
+                        )}</span>с</span></span>`;
                     }
                     if (buffer_diarization && remaining_time_diarization > 0) {
-                        speakerLabel += `<span class="label_diarization"><span class="spinner"></span>Diarization lag<span id='timeInfo'><span class="lag-diarization-value">${fmt1(
+                        speakerLabel += `<span class="label_diarization"><span class="spinner"></span>Задержка диаризации<span id='timeInfo'><span class="lag-diarization-value">${fmt1(
                             remaining_time_diarization
-                        )}</span>s</span></span>`;
+                        )}</span>с</span></span>`;
                     }
                 }
 
@@ -479,7 +479,7 @@ async function startTranscription() {
         isTranscribing = true;
         updateUI();
     } catch (err) {
-        statusText.textContent = "Could not connect to WebSocket. Aborted.";
+        statusText.textContent = "Не удалось подключиться к WebSocket. Прервано.";
         console.error(err);
         updateUI(); // Ensure UI is consistent on failure
     }
@@ -500,7 +500,7 @@ async function stopTranscription() {
 
     if (websocket && websocket.readyState === WebSocket.OPEN) {
         websocket.close();
-        statusText.textContent = "Transcription stopped. Processing final audio...";
+        statusText.textContent = "Транскрипция остановлена. Обрабатывается финальное аудио...";
     }
 
     if (timerInterval) {
@@ -519,17 +519,17 @@ function updateUI() {
     stopButton.disabled = !isTranscribing || waitingForStop;
 
     if (waitingForStop) {
-        if (statusText.textContent !== "Transcription stopped. Processing final audio...") {
-            statusText.textContent = "Please wait for processing to complete...";
+        if (statusText.textContent !== "Транскрипция остановлена. Обрабатывается финальное аудио...") {
+            statusText.textContent = "Пожалуйста, подождите завершения обработки...";
         }
     } else if (isTranscribing) {
         statusText.textContent = "";
     } else {
         if (
-            statusText.textContent !== "Finished processing audio! Ready to transcribe again." &&
-            statusText.textContent !== "Processing finalized or connection closed."
+            statusText.textContent !== "Обработка аудио завершена! Готов к новой транскрипции." &&
+            statusText.textContent !== "Обработка завершена или соединение закрыто."
         ) {
-            statusText.textContent = "Click to start transcription";
+            statusText.textContent = "Нажмите 'Запуск' для начала транскрипции";
         }
     }
 }

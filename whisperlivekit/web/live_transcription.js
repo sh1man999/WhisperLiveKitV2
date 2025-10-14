@@ -252,19 +252,19 @@ async function enumerateMicrophones() {
         console.log(`Found ${availableMicrophones.length} microphone(s)`);
     } catch (error) {
         console.error('Error enumerating microphones:', error);
-        statusText.textContent = "Error accessing microphones. Please grant permission.";
+        statusText.textContent = "Ошибка доступа к микрофонам. Пожалуйста, предоставьте разрешение.";
     }
 }
 
 function populateMicrophoneSelect() {
     if (!microphoneSelect) return;
 
-    microphoneSelect.innerHTML = '<option value="">Default Microphone</option>';
+    microphoneSelect.innerHTML = '<option value="">Микрофон по умолчанию</option>';
 
     availableMicrophones.forEach((device, index) => {
         const option = document.createElement('option');
         option.value = device.deviceId;
-        option.textContent = device.label || `Microphone ${index + 1}`;
+        option.textContent = device.label || `Микрофон ${index + 1}`;
         microphoneSelect.appendChild(option);
     });
 
@@ -296,7 +296,7 @@ function handleMicrophoneChange() {
     localStorage.setItem('selectedMicrophone', selectedMicrophoneId || '');
 
     const selectedDevice = availableMicrophones.find(mic => mic.deviceId === selectedMicrophoneId);
-    const deviceName = selectedDevice ? selectedDevice.label : 'Default Microphone';
+    const deviceName = selectedDevice ? selectedDevice.label : 'Микрофон по умолчанию';
 
     console.log(`Selected microphone: ${deviceName}`);
     statusText.textContent = `Микрофон изменен на: ${deviceName}`;
@@ -346,20 +346,20 @@ function setupWebSocket() {
             currentUrl.searchParams.set("language", selectedLanguage);
             websocket = new WebSocket(currentUrl.toString());
         } catch (error) {
-            statusText.textContent = "Invalid WebSocket URL. Please check and try again.";
+            statusText.textContent = "Неверный WebSocket URL. Пожалуйста, проверьте и попробуйте снова.";
             reject(error);
             return;
         }
 
         websocket.onopen = () => {
-            statusText.textContent = "Connected to server.";
+            statusText.textContent = "Подключено к серверу.";
             resolve();
         };
 
         websocket.onclose = () => {
             if (userClosing) {
                 if (waitingForStop) {
-                    statusText.textContent = "Processing finalized or connection closed.";
+                    statusText.textContent = "Обработка завершена или соединение закрыто.";
                     if (lastReceivedData) {
                         renderLinesWithBuffer(
                             lastReceivedData.lines || [],
@@ -372,7 +372,7 @@ function setupWebSocket() {
                     }
                 }
             } else {
-                statusText.textContent = "Disconnected from the WebSocket server. (Check logs if model is loading.)";
+                statusText.textContent = "Отключено от WebSocket сервера. (Проверьте логи, если загружается модель.)";
                 if (isRecording) {
                     stopRecording();
                 }
@@ -386,8 +386,8 @@ function setupWebSocket() {
         };
 
         websocket.onerror = () => {
-            statusText.textContent = "Error connecting to WebSocket.";
-            reject(new Error("Error connecting to WebSocket"));
+            statusText.textContent = "Ошибка подключения к WebSocket.";
+            reject(new Error("Ошибка подключения к WebSocket"));
         };
 
         websocket.onmessage = (event) => {
@@ -395,8 +395,8 @@ function setupWebSocket() {
             if (data.type === "config") {
                 serverUseAudioWorklet = !!data.useAudioWorklet;
                 statusText.textContent = serverUseAudioWorklet
-                    ? "Connected. Using AudioWorklet (PCM)."
-                    : "Connected. Using MediaRecorder (WebM).";
+                    ? "Подключено. Используется AudioWorklet (PCM)."
+                    : "Подключено. Используется MediaRecorder (WebM).";
                 if (configReadyResolve) configReadyResolve();
                 return;
             }
@@ -415,7 +415,7 @@ function setupWebSocket() {
                         true
                     );
                 }
-                statusText.textContent = "Finished processing audio! Ready to record again.";
+                statusText.textContent = "Обработка аудио завершена! Готов к новой записи.";
                 recordButton.disabled = false;
 
                 if (websocket) {
@@ -459,7 +459,7 @@ function renderLinesWithBuffer(
 ) {
     if (current_status === "no_audio_detected") {
         linesTranscriptDiv.innerHTML =
-            "<p style='text-align: center; color: var(--muted); margin-top: 20px;'><em>No audio detected...</em></p>";
+            "<p style='text-align: center; color: var(--muted); margin-top: 20px;'><em>Аудио не обнаружено...</em></p>";
         return;
     }
 
@@ -506,7 +506,7 @@ function renderLinesWithBuffer(
             } else if (item.speaker == 0 && !isFinalizing) {
                 speakerLabel = `<span class='loading'><span class="spinner"></span><span id='timeInfo'><span class="loading-diarization-value">${fmt1(
                     remaining_time_diarization
-                )}</span> second(s) of audio are undergoing diarization</span></span>`;
+                )}</span> сек. аудио обрабатывается диаризацией</span></span>`;
             } else if (item.speaker !== 0) {
                 const speakerNum = `<span class="speaker-badge">${item.speaker}</span>`;
                 speakerLabel = `<span id="speaker">${speakerIcon}${speakerNum}<span id='timeInfo'>${timeInfo}</span></span>`;
@@ -521,14 +521,14 @@ function renderLinesWithBuffer(
             if (idx === lines.length - 1) {
                 if (!isFinalizing && item.speaker !== -2) {
                     if (remaining_time_transcription > 0) {
-                        speakerLabel += `<span class="label_transcription"><span class="spinner"></span>Transcription lag <span id='timeInfo'><span class="lag-transcription-value">${fmt1(
+                        speakerLabel += `<span class="label_transcription"><span class="spinner"></span>Задержка транскрипции <span id='timeInfo'><span class="lag-transcription-value">${fmt1(
                             remaining_time_transcription
-                        )}</span>s</span></span>`;
+                        )}</span>с</span></span>`;
                     }
                     if (buffer_diarization && remaining_time_diarization > 0) {
-                        speakerLabel += `<span class="label_diarization"><span class="spinner"></span>Diarization lag<span id='timeInfo'><span class="lag-diarization-value">${fmt1(
+                        speakerLabel += `<span class="label_diarization"><span class="spinner"></span>Задержка диаризации<span id='timeInfo'><span class="lag-diarization-value">${fmt1(
                             remaining_time_diarization
-                        )}</span>s</span></span>`;
+                        )}</span>с</span></span>`;
                     }
                 }
 
@@ -656,14 +656,14 @@ async function startRecording() {
                     console.warn('could not preserve system audio:', audioError);
                 }
 
-                statusText.textContent = "Using tab audio capture.";
+                statusText.textContent = "Используется захват аудио вкладки.";
             } catch (tabError) {
                 console.log('Tab capture not available, falling back to microphone', tabError);
                 const audioConstraints = selectedMicrophoneId
                     ? {audio: {deviceId: {exact: selectedMicrophoneId}}}
                     : {audio: true};
                 stream = await navigator.mediaDevices.getUserMedia(audioConstraints);
-                statusText.textContent = "Using microphone audio.";
+                statusText.textContent = "Используется аудио с микрофона.";
             }
         } else if (isWebContext) {
             const audioConstraints = selectedMicrophoneId
@@ -680,7 +680,7 @@ async function startRecording() {
 
         if (serverUseAudioWorklet) {
             if (!audioContext.audioWorklet) {
-                throw new Error("AudioWorklet is not supported in this browser");
+                throw new Error("AudioWorklet не поддерживается в этом браузере");
             }
             await audioContext.audioWorklet.addModule("/web/pcm_worklet.js");
             workletNode = new AudioWorkletNode(audioContext, "pcm-forwarder", {
@@ -740,9 +740,9 @@ async function startRecording() {
     } catch (err) {
         if (window.location.hostname === "0.0.0.0") {
             statusText.textContent =
-                "Error accessing microphone. Browsers may block microphone access on 0.0.0.0. Try using localhost:8000 instead.";
+                "Ошибка доступа к микрофону. Браузеры могут блокировать доступ к микрофону на 0.0.0.0. Попробуйте использовать localhost:8000.";
         } else {
-            statusText.textContent = "Error accessing microphone. Please allow microphone access.";
+            statusText.textContent = "Ошибка доступа к микрофону. Пожалуйста, разрешите доступ к микрофону.";
         }
         console.error(err);
     }
@@ -764,7 +764,7 @@ async function stopRecording() {
     if (websocket && websocket.readyState === WebSocket.OPEN) {
         const emptyBlob = new Blob([], {type: "audio/webm"});
         websocket.send(emptyBlob);
-        statusText.textContent = "Recording stopped. Processing final audio...";
+        statusText.textContent = "Запись остановлена. Обрабатывается финальное аудио...";
     }
 
     if (recorder) {
@@ -853,7 +853,7 @@ async function toggleRecording() {
                 await startRecording();
             }
         } catch (err) {
-            statusText.textContent = "Could not connect to WebSocket or access mic. Aborted.";
+            statusText.textContent = "Не удалось подключиться к WebSocket или получить доступ к микрофону. Прервано.";
             console.error(err);
         }
     } else {
@@ -867,17 +867,17 @@ function updateUI() {
     recordButton.disabled = waitingForStop;
 
     if (waitingForStop) {
-        if (statusText.textContent !== "Recording stopped. Processing final audio...") {
-            statusText.textContent = "Please wait for processing to complete...";
+        if (statusText.textContent !== "Запись остановлена. Обрабатывается финальное аудио...") {
+            statusText.textContent = "Пожалуйста, подождите завершения обработки...";
         }
     } else if (isRecording) {
         statusText.textContent = "";
     } else {
         if (
-            statusText.textContent !== "Finished processing audio! Ready to record again." &&
-            statusText.textContent !== "Processing finalized or connection closed."
+            statusText.textContent !== "Обработка аудио завершена! Готов к новой записи." &&
+            statusText.textContent !== "Обработка завершена или соединение закрыто."
         ) {
-            statusText.textContent = "Click to start transcription";
+            statusText.textContent = "Нажмите для начала транскрипции";
         }
     }
     if (!waitingForStop) {
