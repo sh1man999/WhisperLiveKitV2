@@ -127,7 +127,8 @@ class Silence:
 @dataclass
 class Line(TimedText):
     translation: str = ''
-    
+    id: Optional[int] = None  # Unique identifier for the line
+
     def to_dict(self):
         _dict = {
             'speaker': int(self.speaker) if self.speaker != -1 else 1,
@@ -135,6 +136,8 @@ class Line(TimedText):
             'start': format_time(self.start),
             'end': format_time(self.end),
         }
+        if self.id is not None:
+            _dict['id'] = self.id
         if self.translation:
             _dict['translation'] = self.translation
         if self.detected_language:

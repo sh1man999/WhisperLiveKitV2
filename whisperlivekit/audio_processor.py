@@ -198,10 +198,16 @@ class AudioProcessor:
                 chunk = await self.ffmpeg_manager.read_data(buffer_size)
                 if not chunk:
                     # No data currently available
+                    logger.info(f"FFmpeg returned empty chunk (timeout or end of stream)")
                     await asyncio.sleep(0.05)
                     continue
 
                 self.pcm_buffer.extend(chunk)
+
+                # Log only when buffer reaches processing threshold
+                if len(self.pcm_buffer) >= self.bytes_per_sec:
+                    logger.info(f"Buffer ready for processing: {len(self.pcm_buffer)} bytes ({len(self.pcm_buffer) / self.bytes_per_sec:.2f}s)")
+
                 await self.handle_pcm_data()
 
             except asyncio.CancelledError:
@@ -552,7 +558,11 @@ class AudioProcessor:
 
     async def handle_pcm_data(self):
         # Process when enough data
+        buffer_duration = len(self.pcm_buffer) / self.bytes_per_sec
+        required_duration = self.bytes_per_sec / self.bytes_per_sec  # Always 1.0
+
         if len(self.pcm_buffer) < self.bytes_per_sec:
+            logger.debug(f"Buffer: {buffer_duration:.2f}s / {required_duration:.2f}s - waiting for more data")
             return
 
         if len(self.pcm_buffer) > self.max_bytes_per_sec:

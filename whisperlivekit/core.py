@@ -31,7 +31,7 @@ class TranscriptionEngine:
                  num_workers: int = 1,
                  lan: str="auto",
                  buffer_trimming: str= "segment",
-                 confidence_validation: bool= False,
+                 confidence_validation: bool= False, # Если он включен (True), метод flush будет "подтверждать" (commit) токены, даже если они не совпадают с предыдущим буфером, при условии, что их вероятность (token.probability) очень высока ( > 0.95).
                  buffer_trimming_sec: int= 15,
                  segmentation_model_name: str= "pyannote/segmentation-3.0",
                  embedding_model_name: str = "pyannote/embedding",

@@ -205,7 +205,7 @@ class OnlineASRProcessor:
         """
         current_audio_processed_upto = self.get_audio_buffer_end_time()
         prompt_text, _ = self.prompt()
-        logger.debug(
+        logger.info(
             f"Transcribing {len(self.audio_buffer)/self.SAMPLING_RATE:.2f} seconds from {self.buffer_time_offset:.2f}"
         )
         res = self.asr.transcribe(self.audio_buffer, init_prompt=prompt_text, language=language)
@@ -218,9 +218,11 @@ class OnlineASRProcessor:
             self.time_of_last_asr_output = self.committed[-1].end
 
         completed = self.concatenate_tokens(committed_tokens)
-        logger.debug(f">>>> COMPLETE NOW: {completed.text}")
+        # Текст подтвержден - это тот текст, который он окончательно "зафиксировал" и который уже не изменится.
+        logger.info(f"Текст подтвержден: {completed.text}")
         incomp = self.concatenate_tokens(self.transcript_buffer.buffer)
-        logger.debug(f"INCOMPLETE: {incomp.text}")
+        # Неподтвержденный - это текст, который он только начал печатать. Он может его исправить, удалить или переписать в следующую секунду. Это "черновик" или "хвост" гипотезы.
+        logger.info(f"Неподтвержденный: {incomp.text}")
 
         buffer_duration = len(self.audio_buffer) / self.SAMPLING_RATE
         if not committed_tokens and buffer_duration > self.buffer_trimming_sec:

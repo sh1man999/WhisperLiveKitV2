@@ -179,6 +179,9 @@ def format_output(state, silence, current_time, args, sep):
 
 
     for i, line in enumerate(lines):
+        # Assign unique ID based on position
+        line.id = i
+
         should_capitalize = False
         if len(lines) == 1:
             should_capitalize = True
