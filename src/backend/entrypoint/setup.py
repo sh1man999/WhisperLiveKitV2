@@ -69,4 +69,5 @@ def configure_logging(config: Config, level=logging.DEBUG) -> None:
     logging.getLogger("python_multipart.multipart").setLevel(logging.INFO)
     logging.getLogger("pyannote").setLevel(logging.ERROR)
     logging.getLogger('numba').setLevel(logging.ERROR)
+    logging.getLogger("faster_whisper").setLevel(logging.WARNING)
 

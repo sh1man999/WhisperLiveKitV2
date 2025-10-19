@@ -237,7 +237,7 @@ class AudioProcessor:
                     asr_processing_logs += f" + Silence of = {item.duration:.2f}s"
                     if self.tokens:
                         asr_processing_logs += f" | last_end = {self.tokens[-1].end} |"
-                    logger.info(asr_processing_logs)
+                    logger.debug(asr_processing_logs)
                     cumulative_pcm_duration_stream_time += item.duration
                     self.transcription.insert_silence(item.duration, self.tokens[-1].end if self.tokens else 0)
                     continue
@@ -246,7 +246,7 @@ class AudioProcessor:
                 elif isinstance(item, np.ndarray):
                     pcm_array = item
                 
-                logger.info(asr_processing_logs)
+                logger.debug(asr_processing_logs)
                 
                 duration_this_chunk = len(pcm_array) / self.sample_rate
                 cumulative_pcm_duration_stream_time += duration_this_chunk

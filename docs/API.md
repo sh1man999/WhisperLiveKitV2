@@ -77,7 +77,6 @@ Principles:
       "buffer": {
         "transcription": string,
         "diarization": string,
-        "translation": string
       }
     }
   ],
