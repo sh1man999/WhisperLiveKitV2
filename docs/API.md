@@ -1,9 +1,3 @@
-# WhisperLiveKit WebSocket API Documentation
-
-> !! **Note**: The new API structure described in this document is currently under deployment. 
-This documentation is intended for devs who want to build custom frontends.
-
-WLK provides real-time speech transcription, speaker diarization through a WebSocket API. The server sends incremental updates as audio is processed, allowing clients to display live transcription results with minimal latency.
 
 ---
 
