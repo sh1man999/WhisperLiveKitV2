@@ -3,7 +3,7 @@
 > !! **Note**: The new API structure described in this document is currently under deployment. 
 This documentation is intended for devs who want to build custom frontends.
 
-WLK provides real-time speech transcription, speaker diarization, and translation through a WebSocket API. The server sends incremental updates as audio is processed, allowing clients to display live transcription results with minimal latency.
+WLK provides real-time speech transcription, speaker diarization through a WebSocket API. The server sends incremental updates as audio is processed, allowing clients to display live transcription results with minimal latency.
 
 ---
 
@@ -23,7 +23,6 @@ The current API sends complete state snapshots on each update (several time per 
       "text": str,
       "start": float,
       "end": float,
-      "translation": str | null,
       "detected_language": str
     }
   ],
@@ -62,7 +61,6 @@ Principles:
       "start": float,
       "end": float,
       "language": string | null,
-      "translation": string,
       "words": [
         {
           "text": string,
@@ -119,7 +117,6 @@ Principles:
 | `start` | `float` | Timestamp (seconds) of the first word in this update. |
 | `end` | `float` | Timestamp (seconds) of the last word in this update. |
 | `language` | `string \| null` | ISO language code (e.g., "en", "fr"). `null` until language is detected. |
-| `translation` | `string` | Validated translation text for this update. Should be **appended** to the segment's translation on the client side. |
 | `words` | `Array` | Array of word-level objects with timing and validation information. |
 | `buffer` | `Object` | Per-segment temporary buffers, see below |
 
@@ -132,7 +129,6 @@ Principles:
 | `end` | `number` | End timestamp (seconds) of this word. |
 | `validated.text` | `boolean` | Whether the transcription text has been validated. if false, word is also in buffer: transcription |
 | `validated.speaker` | `boolean` | Whether the speaker assignment has been validated. if false, word is also in buffer: diarization |
-| `validated.language` | `boolean` | Whether the language detection has been validated. if false, word is also in buffer: translation |
 
 ### Buffer Object (Per-Segment)
 
@@ -142,7 +138,6 @@ Buffers are **ephemeral**. They should be displayed to the user but not stored p
 |-------|------|-------------|
 | `transcription` | `string` | Pending transcription text. Displayed immediately but **overwritten** on next update. |
 | `diarization` | `string` | Pending diarization text (text waiting for speaker assignment). Displayed immediately but **overwritten** on next update. |
-| `translation` | `string` | Pending translation text. Displayed immediately but **overwritten** on next update. |
 
 
 ### Metadata Fields
@@ -197,7 +192,7 @@ When language is detected for a segment:
 
 Buffers are **per-segment** to handle multi-speaker scenarios correctly.
 
-#### Example: Translation with diarization and translation
+#### Example: Translation with diarization
 
 ```jsonc
 // Update 1
@@ -207,11 +202,9 @@ Buffers are **per-segment** to handle multi-speaker scenarios correctly.
       "id": 1,
       "speaker": 1,
       "text": "Hello world, how are",
-      "translation": "",
       "buffer": {
         "transcription": "",
         "diarization": " you on",
-        "translation": "Bonjour le monde"
       }
     }
   ]
@@ -231,11 +224,9 @@ Buffers are **per-segment** to handle multi-speaker scenarios correctly.
       "id": 1,
       "speaker": 1,
       "text": " you on this",
-      "translation": "Bonjour tout le monde",
       "buffer": {
         "transcription": "",
         "diarization": " beautiful day",
-        "translation": ",comment"
       }
     },
   ]
