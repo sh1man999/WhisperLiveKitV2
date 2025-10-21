@@ -35,7 +35,8 @@ class TranscriptionEngine:
                  buffer_trimming_sec: int= 15,
                  segmentation_model_name: str= "pyannote/segmentation-3.0",
                  embedding_model_name: str = "pyannote/embedding",
-                 compute_type: str = "float16"
+                 compute_type: str = "float16",
+                 beam_size: int = 5,  # Увеличение до 7-10 может улучшить пунктуацию
                  ):
 
         self.args = Namespace(
@@ -88,7 +89,8 @@ class TranscriptionEngine:
             device_index=device_index,
             cpu_threads=cpu_threads,
             num_workers=num_workers,
-            compute_type=compute_type
+            compute_type=compute_type,
+            beam_size=beam_size
         )
 
         if is_diarization:

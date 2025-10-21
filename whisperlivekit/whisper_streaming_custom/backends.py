@@ -30,9 +30,12 @@ class FasterWhisperASR:
         cpu_threads: int = 0,
         num_workers: int = 1,
         compute_type: str = "float16",
+        beam_size: int = 5,
     ):
         self.logfile = logfile
         self.transcribe_kargs = {}
+        self.beam_size = beam_size
+
         if lan == "auto":
             self.original_language = None
         else:
@@ -82,11 +85,20 @@ class FasterWhisperASR:
 
     def transcribe(self, audio: np.ndarray, init_prompt: str = "", language: str = None) -> list:
         lang_to_use = language if language and language != "auto" else self.original_language
+
+        # Добавляем явный промпт с пунктуацией
+        punctuation_prompt = ""
+        # if lang_to_use == "ru":
+        #     punctuation_prompt = "Добрый день! Как дела? Всё хорошо. "
+
+        # Комбинируем промпт с пунктуацией и контекстный промпт
+        combined_prompt = punctuation_prompt + init_prompt if init_prompt else punctuation_prompt
+
         segments, info = self.model.transcribe(
             audio,
             language=lang_to_use,
-            initial_prompt=init_prompt,
-            beam_size=5,
+            initial_prompt=combined_prompt,
+            beam_size=self.beam_size,
             word_timestamps=True,
             condition_on_previous_text=True,
             **self.transcribe_kargs,

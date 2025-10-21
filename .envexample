@@ -18,3 +18,12 @@ WHISPER__MODELS_PATH=./models
 #PYANNOTE__EMBEDDING_MODEL=pyannote/embedding
 #PYANNOTE__DEVICE=cuda
 #PYANNOTE__CUDA_DEVICE_INDEX=0
+# Настройки буферизации (важно для моделей turbo)
+# buffer_trimming: "segment" или "sentence" (по умолчанию "segment")
+# buffer_trimming_sec: время в секундах (по умолчанию 5)
+# Уменьшите buffer_trimming_sec если модель не ставит знаки препинания при быстрой речи
+#WHISPER__BUFFER_TRIMMING=segment
+#WHISPER__BUFFER_TRIMMING_SEC=15
+
+# beam_size: количество beam search (5-10, больше = лучше качество, но медленнее)
+#WHISPER__BEAM_SIZE=5

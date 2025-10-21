@@ -40,4 +40,7 @@ class TranscriptionProvider(Provider):
             num_workers=config.whisper.num_workers,
             compute_type=config.whisper.compute_type,
             split_on_punctuation_for_display=True, # Разбивает на строки при обнаружении знаков препинаний
+            buffer_trimming=config.whisper.buffer_trimming,  # Режим сегментации из конфига
+            buffer_trimming_sec=config.whisper.buffer_trimming_sec,  # Время нарезки буфера из конфига
+            beam_size=config.whisper.beam_size
         )

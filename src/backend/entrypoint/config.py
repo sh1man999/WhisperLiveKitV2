@@ -119,6 +119,9 @@ class WhisperConfig(BaseNeuralConfig):
     cpu_threads: int
     num_workers: int
     device: str
+    buffer_trimming: str
+    buffer_trimming_sec: int
+    beam_size: int
 
     @classmethod
     def from_env(cls) -> "WhisperConfig":
@@ -130,6 +133,9 @@ class WhisperConfig(BaseNeuralConfig):
         cpu_threads = getenv("WHISPER__CPU_THREADS", "1")
         num_workers = getenv("WHISPER__NUM_WORKERS", "1")
         device = getenv("WHISPER__DEVICE", "cuda")
+        buffer_trimming = getenv("WHISPER__BUFFER_TRIMMING", "segment")
+        buffer_trimming_sec = getenv("WHISPER__BUFFER_TRIMMING_SEC", "15")
+        beam_size = getenv("WHISPER__BEAM_SIZE", "5")
 
         cls.validate_device(key="WHISPER__DEVICE", device=device, allowed_devices={"cpu", "cuda", "auto"})
         if models_path is None:
@@ -147,6 +153,9 @@ class WhisperConfig(BaseNeuralConfig):
             cpu_threads=int(cpu_threads),
             num_workers=int(num_workers),
             device=device,
+            buffer_trimming=buffer_trimming,
+            buffer_trimming_sec=int(buffer_trimming_sec),
+            beam_size=int(beam_size),
         )
 
 

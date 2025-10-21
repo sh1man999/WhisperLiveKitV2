@@ -68,6 +68,7 @@ def backend_factory(
             cpu_threads: int = 0,
             num_workers: int = 1,
             compute_type: str = "float16",
+            beam_size: int = 5,
         ):
 
     t = time.time()
@@ -81,7 +82,8 @@ def backend_factory(
         device_index=device_index,
         cpu_threads=cpu_threads,
         num_workers=num_workers,
-        compute_type=compute_type
+        compute_type=compute_type,
+        beam_size=beam_size,
     )
     e = time.time()
     logger.info(f"done. It took {round(e - t, 2)} seconds.")
@@ -92,7 +94,7 @@ def backend_factory(
         tokenizer = create_tokenizer(lan)
     else:
         tokenizer = None
-    
+
     warmup_asr(asr, warmup_file)
 
     asr.confidence_validation = confidence_validation
