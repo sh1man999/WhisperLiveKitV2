@@ -88,8 +88,8 @@ class FasterWhisperASR:
 
         # Добавляем явный промпт с пунктуацией
         punctuation_prompt = ""
-        # if lang_to_use == "ru":
-        #     punctuation_prompt = "Добрый день! Как дела? Всё хорошо. "
+        if lang_to_use == "ru":
+            punctuation_prompt = "Добрый день! Как дела? Всё хорошо. "
 
         # Комбинируем промпт с пунктуацией и контекстный промпт
         combined_prompt = punctuation_prompt + init_prompt if init_prompt else punctuation_prompt

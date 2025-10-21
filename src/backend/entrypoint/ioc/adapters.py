@@ -42,5 +42,6 @@ class TranscriptionProvider(Provider):
             split_on_punctuation_for_display=True, # Разбивает на строки при обнаружении знаков препинаний
             buffer_trimming=config.whisper.buffer_trimming,  # Режим сегментации из конфига
             buffer_trimming_sec=config.whisper.buffer_trimming_sec,  # Время нарезки буфера из конфига
-            beam_size=config.whisper.beam_size
+            beam_size=config.whisper.beam_size,
+            min_chunk_size=2 # 2 сек
         )
