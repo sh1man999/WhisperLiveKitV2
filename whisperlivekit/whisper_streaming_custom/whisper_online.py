@@ -62,7 +62,6 @@ def backend_factory(
             buffer_trimming_sec,
             confidence_validation,
             warmup_file=None,
-            min_chunk_size=None,
             device="auto",
             device_index: Union[int, list[int]] = 0,
             cpu_threads: int = 0,

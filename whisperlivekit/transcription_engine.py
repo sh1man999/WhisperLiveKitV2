@@ -21,7 +21,8 @@ class TranscriptionEngine:
                  disable_punctuation_split:bool=False,
                  diarization_backend: str="diart",
                  warmup_file: str=None,
-                 min_chunk_size: float=0.5,
+                 min_chunk_size_sec: float=0.5,
+                 max_chunk_size_sec: float=5,
                  model_size: str="tiny",
                  model_cache_dir: str=None,
                  model_dir: str=None,
@@ -51,7 +52,8 @@ class TranscriptionEngine:
             disable_punctuation_split=disable_punctuation_split,
             diarization_backend=diarization_backend,
             warmup_file=warmup_file,
-            min_chunk_size=min_chunk_size,
+            min_chunk_size_sec=min_chunk_size_sec,
+            max_chunk_size_sec=max_chunk_size_sec,
             model_size=model_size,
             model_cache_dir=model_cache_dir,
             model_dir=model_dir,
@@ -84,7 +86,6 @@ class TranscriptionEngine:
             buffer_trimming_sec=buffer_trimming_sec,
             confidence_validation=confidence_validation,
             warmup_file=warmup_file,
-            min_chunk_size=min_chunk_size,
             device=device,
             device_index=device_index,
             cpu_threads=cpu_threads,
@@ -97,7 +98,7 @@ class TranscriptionEngine:
             if diarization_backend == "diart":
                 from whisperlivekit.diarization.diart_backend import DiartDiarization
                 self.diarization_model = DiartDiarization(
-                    block_duration=min_chunk_size,
+                    block_duration=min_chunk_size_sec,
                     segmentation_model_name=segmentation_model_name,
                     embedding_model_name=embedding_model_name,
                 )

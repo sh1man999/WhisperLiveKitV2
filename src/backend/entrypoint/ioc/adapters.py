@@ -43,5 +43,6 @@ class TranscriptionProvider(Provider):
             buffer_trimming=config.whisper.buffer_trimming,  # Режим сегментации из конфига
             buffer_trimming_sec=config.whisper.buffer_trimming_sec,  # Время нарезки буфера из конфига
             beam_size=config.whisper.beam_size,
-            min_chunk_size=2 # 2 сек
+            min_chunk_size_sec=3,
+            max_chunk_size_sec=6
         )

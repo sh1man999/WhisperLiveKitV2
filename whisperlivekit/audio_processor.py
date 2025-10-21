@@ -4,7 +4,7 @@ from time import time, sleep
 import logging
 import traceback
 from whisperlivekit.timed_objects import ASRToken, Silence, Line, FrontData, State, Transcript, ChangeSpeaker
-from whisperlivekit.core import TranscriptionEngine, online_diarization_factory
+from whisperlivekit.transcription_engine import TranscriptionEngine, online_diarization_factory
 from whisperlivekit.silero_vad_iterator import FixedVADIterator
 from whisperlivekit.results_formater import format_output
 from whisperlivekit.ffmpeg_manager import FFmpegManager, FFmpegState
@@ -57,10 +57,10 @@ class AudioProcessor:
         self.args = transcription_engine.args
         self.sample_rate = 16000
         self.channels = 1
-        self.samples_per_sec = int(self.sample_rate * self.args.min_chunk_size)
-        self.bytes_per_sample = 2
-        self.bytes_per_sec = self.samples_per_sec * self.bytes_per_sample
-        self.max_bytes_per_sec = 32000 * 5  # 5 seconds of audio at 32 kHz
+        self.samples_per_sec = int(self.sample_rate * self.args.min_chunk_size_sec) # Это минимальное количество сэмплов в одном чанке, которое AudioProcessor будет обрабатывать.
+        self.bytes_per_sample = 2 # Почему 2? Потому что система работает со стандартным несжатым аудио-форматом PCM s16le (signed 16-bit little-endian). 16 бит — это ровно 2 байта.
+        self.bytes_per_sec = self.samples_per_sec * self.bytes_per_sample # Это минимальный размер чанка в байтах, который запускает обработку.
+        self.max_bytes_per_sec = (self.sample_rate * 2) * self.args.max_chunk_size_sec  # Это максимальный размер чанка в байтах, который система обработает за один раз. Это "потолок", который предотвращает переполнение и слишком большие задержки.
         self.is_pcm_input = pcm_input
 
         # State management
@@ -561,6 +561,7 @@ class AudioProcessor:
         buffer_duration = len(self.pcm_buffer) / self.bytes_per_sec
         required_duration = self.bytes_per_sec / self.bytes_per_sec  # Always 1.0
 
+        # "Если в нашем буфере pcm_buffer накоплено меньше, чем 16000 байт (т.е. меньше 0.5 сек аудио), то ничего не делаем и ждем, пока данных не накопится больше
         if len(self.pcm_buffer) < self.bytes_per_sec:
             logger.debug(f"Buffer: {buffer_duration:.2f}s / {required_duration:.2f}s - waiting for more data")
             return
@@ -571,6 +572,8 @@ class AudioProcessor:
                 f"Consider using a smaller model."
             )
 
+        # Если в буфере накопилось очень много данных (например, 10 секунд), не пытаться обработать их все сразу.
+        # Взять на обработку только (например 5 секунд), а остальное оставить в буфере до следующего раза
         chunk_size = min(len(self.pcm_buffer), self.max_bytes_per_sec)
         aligned_chunk_size = (chunk_size // self.bytes_per_sample) * self.bytes_per_sample
         

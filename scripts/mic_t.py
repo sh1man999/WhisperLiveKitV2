@@ -55,7 +55,7 @@ async def send_audio(websocket, source, chunk_size_s=1.0, sample_rate=16000, sim
 
 
 async def _send_chunk(websocket, chunk, sr_in):
-    """Encode PCM chunk to bytes and send"""
+    """Encode PCM chunk to bytes and send s16le"""
     chunk_int16 = (chunk * 32768).astype(np.int16)
     await websocket.send(chunk_int16.tobytes())
 
