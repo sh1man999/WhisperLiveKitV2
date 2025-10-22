@@ -46,13 +46,12 @@ async def send_audio(websocket, source, chunk_size_s=1.0, sample_rate=16000):
             chunk = audio[i:i + chunk_size]
             if len(chunk) == 0:
                 continue
-            await _send_chunk(websocket, chunk, sample_rate)
-        await asyncio.sleep(100)
+            await _send_chunk(websocket, chunk)
         await websocket.send(b"")  # End of stream
         return duration
 
 
-async def _send_chunk(websocket, chunk, sr_in):
+async def _send_chunk(websocket, chunk):
     """Encode PCM chunk to bytes and send s16le"""
     chunk_int16 = (chunk * 32768).astype(np.int16)
     await websocket.send(chunk_int16.tobytes())
@@ -76,6 +75,7 @@ async def receive_updates(websocket, first_token_event):  # noqa: C901, ANN001
 
             # Process finalized lines
             lines = resp.get("lines", [])
+            #logger.info(f"Received {lines=} lines from websocket")
             valid_lines = [
                 line for line in lines
                 if line.get("text", "").strip() and line.get("speaker", -1) >= 0
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="ASR Streaming Client, you should start the Server \
             with pcm-input: whisperlivekit-server  --pcm-input")
-    parser.add_argument("--source", type=str, default=os.path.join(Path(__file__).parent, "assets", "received_audio.wav"),
+    parser.add_argument("--source", type=str, default=os.path.join(Path(__file__).parent, "assets", "test.flac"),
                         help="Audio file path or 'mic' for microphone")
     parser.add_argument("--host", type=str, default="localhost")
     parser.add_argument("--port", type=int, default=8000)

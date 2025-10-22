@@ -201,7 +201,7 @@ def main():
     parser.add_argument(
         "--audio",
         type=str,
-        default=str(Path(__file__).parent / "assets" / "test.flac"),
+        default=str(Path(__file__).parent / "assets" / "received_audio.wav"),
         help="Путь к аудио файлу для тестирования"
     )
 

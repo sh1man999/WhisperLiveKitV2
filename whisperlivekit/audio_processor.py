@@ -64,8 +64,9 @@ class AudioProcessor:
         
         # Models and processing
         self.asr = transcription_engine.asr
-        self.vac_model = transcription_engine.vac_model
-        self.vac = FixedVADIterator(model=transcription_engine.vac_model, min_silence_duration_ms=1000, threshold=0.2) # threshold 0.2 or 0.5? min_silence_duration_ms?, speech_pad_ms 400?
+        if self.args.vac:
+            self.vac_model = transcription_engine.vac_model
+            self.vac = FixedVADIterator(model=transcription_engine.vac_model, min_silence_duration_ms=1000, threshold=0.2) # threshold 0.2 or 0.5? min_silence_duration_ms?, speech_pad_ms 400?
                          
         self.ffmpeg_manager = None
         self.ffmpeg_reader_task = None
@@ -541,13 +542,21 @@ class AudioProcessor:
         await self.handle_pcm_data()
 
     async def handle_pcm_data(self):
-        # Процесс, когда достаточно данных
-        buffer_duration = len(self.pcm_buffer) / self.min_chunk_size_bytes
-        required_duration = self.min_chunk_size_bytes / self.min_chunk_size_bytes  # Always 1.0
 
-        # Если в нашем буфере pcm_buffer накоплено меньше, чем self.min_chunk_size_bytes байт т.е. меньше (например 0.5) сек аудио, то ничего не делаем и ждем, пока данных не накопится больше
+        # Рассчитаем байты в секунду
+        bytes_per_second = self.sample_rate * self.channels * self.bytes_per_sample
+
+        # Текущая длительность буфера в секундах
+        buffer_duration_sec = len(self.pcm_buffer) / bytes_per_second
+
+        # Требуемая длительность буфера в секундах
+        required_duration_sec = self.min_chunk_size_bytes / bytes_per_second
+
+        # Если в нашем буфере pcm_buffer накоплено меньше, чем self.min_chunk_size_bytes байт
         if len(self.pcm_buffer) < self.min_chunk_size_bytes:
-            logger.debug(f"Буфер: {buffer_duration:.2f}s / {required_duration:.2f}s - ждем больше данных")
+            logger.debug(
+                f"Буфер: {buffer_duration_sec:.2f}s / {required_duration_sec:.2f}s - ждем больше данных"
+            )
             return
 
         if len(self.pcm_buffer) > self.max_chunk_size_bytes:
@@ -576,11 +585,15 @@ class AudioProcessor:
             res = self.vac(pcm_array)
 
         if res is not None:
-            if res.get("end", 0) > res.get("start", 0):
+            # 1. Явно проверяем, что VAD сообщил об ОКОНЧАНИИ речи
+            if res.get("end", 0) > 0:
                 end_of_audio = True
-            elif self.silence: #end of silence
-                self.silence = False
-                silence_buffer = Silence(duration=time() - self.start_silence)
+
+            # 2. Явно проверяем, что VAD сообщил о НАЧАЛЕ речи
+            elif res.get("start", -1) >= 0:  # Используем -1 как "не найдено"
+                if self.silence:  # Если мы были в тишине, прерываем ее
+                    self.silence = False
+                    silence_buffer = Silence(duration=time() - self.start_silence)
 
         if silence_buffer:
             if not self.diarization_before_transcription and self.transcription_queue:
