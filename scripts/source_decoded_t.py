@@ -17,9 +17,8 @@ import logging
 import argparse
 import json
 import time
-import subprocess
 from pathlib import Path
-import numpy as np
+import wave  # <-- Добавлено для сохранения WAV
 
 import websockets
 
@@ -38,16 +37,6 @@ class AudioStreamReader:
 
     async def start(self):
         """Start FFmpeg process to read audio."""
-        # ffmpeg_cmd = [
-        #     'ffmpeg',
-        #     '-i', self.source,
-        #     '-f', 's16le',
-        #     '-acodec', 'pcm_s16le',
-        #     '-ar', str(self.sample_rate),
-        #     '-ac', str(self.channels),
-        #     '-loglevel', 'error',
-        #     'pipe:1'
-        # ]
 
         ffmpeg_cmd = [
             "ffmpeg",
@@ -67,8 +56,7 @@ class AudioStreamReader:
             "2",
             "-i",
             self.source,  # источник
-            "-map",
-            "a:0",  # явный выбор первой аудиодорожки
+            # "-map", "a:0",  # явный выбор первой аудиодорожки
             "-vn",  # отключить видео в выходе
             "-sn",  # отключить субтитры в выходе
             "-f",
@@ -124,18 +112,22 @@ class AudioStreamReader:
                 logger.error(f"Error stopping FFmpeg: {e}")
 
 
-async def send_audio_stream(websocket, stream_reader, chunk_size_s=1.0, sample_rate=16000):
+async def send_audio_stream(websocket, stream_reader, audio_buffer_container, chunk_size_s=1.0, sample_rate=16000):
     """
-    Read audio from stream and send chunks to WebSocket.
+    Read audio from stream, send chunks to WebSocket, and fill the audio buffer.
 
     Args:
         websocket: WebSocket connection
         stream_reader: AudioStreamReader instance
+        audio_buffer_container: A list containing one bytearray [bytearray()] to be filled.
         chunk_size_s: Chunk duration in seconds
         sample_rate: Audio sample rate
     """
     bytes_per_sample = 2  # int16
     chunk_size_bytes = int(sample_rate * chunk_size_s * bytes_per_sample)
+
+    # <-- Используем переданный контейнер
+    full_audio_buffer = audio_buffer_container[0]
 
     logger.info(f"Starting to send audio chunks (chunk_size={chunk_size_s}s, {chunk_size_bytes} bytes)")
 
@@ -150,6 +142,9 @@ async def send_audio_stream(websocket, stream_reader, chunk_size_s=1.0, sample_r
             if not chunk:
                 logger.info("No more data from stream")
                 break
+
+            # <-- Накапливаем аудио в общем буфере
+            full_audio_buffer.extend(chunk)
 
             # Send raw PCM bytes to server
             await websocket.send(chunk)
@@ -172,9 +167,14 @@ async def send_audio_stream(websocket, stream_reader, chunk_size_s=1.0, sample_r
         await websocket.send(b"")
         logger.info(f"Stream complete: {chunk_count} chunks, {total_bytes} bytes sent")
 
-    except Exception as e:
-        logger.error(f"Error sending audio: {e}", exc_info=True)
-        raise
+    except (Exception, asyncio.CancelledError) as e: # <-- Ловим CancelledError
+        if isinstance(e, asyncio.CancelledError):
+            logger.info("Audio sending task cancelled.")
+        else:
+            logger.error(f"Error sending audio: {e}", exc_info=True)
+        # Не делаем re-raise, просто выходим, буфер уже наполнен
+    finally:
+        logger.info(f"Audio sending stopped. Total bytes collected: {len(full_audio_buffer)}")
 
 
 def parse_time_to_seconds(time_str):
@@ -194,8 +194,28 @@ def parse_time_to_seconds(time_str):
         return float(time_str)
 
 
-async def receive_updates(websocket, first_token_event, start_time):
-    """Receive server responses and mark first token."""
+# <-- Новая функция для сохранения аудио
+def save_pcm_to_wav(filename, pcm_data, channels, sample_rate, sample_width=2):
+    """Saves raw PCM s16le data to a WAV file."""
+    try:
+        with wave.open(filename, 'wb') as wf:
+            wf.setnchannels(channels)
+            wf.setsampwidth(sample_width)  # 2 bytes for s16le
+            wf.setframerate(sample_rate)
+            wf.writeframes(pcm_data)
+        logger.info(f"Saved received audio to {filename}")
+    except Exception as e:
+        logger.error(f"Failed to save WAV file: {e}")
+
+
+async def receive_updates(websocket, first_token_event, start_time, all_finalized_lines):
+    """
+    Receive server responses, mark first token, and fill the finalized lines dict.
+
+    Args:
+        ...
+        all_finalized_lines (dict): An empty dictionary to be filled with results.
+    """
     # ANSI color codes
     GRAY = "\033[90m"
     GREEN = "\033[92m"
@@ -206,120 +226,133 @@ async def receive_updates(websocket, first_token_event, start_time):
     last_line_id = None  # Track the last finalized line ID
     last_buffer = ""  # Track last buffer to avoid redundant updates
 
-    while True:
-        try:
-            msg = await websocket.recv()
-            resp = json.loads(msg)
+    # <-- Не создаем новый, а используем переданный словарь
+    # all_finalized_lines = {}
 
-            # Check for errors
-            if resp.get("status") == "error":
-                error_msg = resp.get("error", "Unknown error")
-                print(f"\n{YELLOW}Server error: {error_msg}{RESET}")
-                logger.error(f"Server error: {error_msg}")
-                break
+    try:
+        while True:
+            try:
+                msg = await websocket.recv()
+                resp = json.loads(msg)
 
-            # Process finalized lines
-            lines = resp.get("lines", [])
+                # Check for errors
+                if resp.get("status") == "error":
+                    error_msg = resp.get("error", "Unknown error")
+                    print(f"\n{YELLOW}Server error: {error_msg}{RESET}")
+                    logger.error(f"Server error: {error_msg}")
+                    break
 
-            # Show ALL lines from server (no filtering)
-            valid_lines = [
-                line
-                for line in lines
-                if line.get("speaker", -1) >= 0  # Valid speaker ID
-                and line.get("speaker", -1) != -2  # Not a dummy line
-                and line.get("id") is not None  # Has valid ID
-            ]
+                # Process finalized lines
+                lines = resp.get("lines", [])
 
-            current_seen_lines = set()
+                # Show ALL lines from server (no filtering)
+                valid_lines = [
+                    line
+                    for line in lines
+                    if line.get("speaker", -1) >= 0  # Valid speaker ID
+                       and line.get("speaker", -1) != -2  # Not a dummy line
+                       and line.get("id") is not None  # Has valid ID
+                ]
 
-            for line in valid_lines:
-                line_id = line.get("id")
-                if line_id is None:
-                    continue
+                current_seen_lines = set()
 
-                current_seen_lines.add(line_id)
+                for line in valid_lines:
+                    line_id = line.get("id")
+                    if line_id is None:
+                        continue
 
-                # Parse time (handles both float and '0:01:23' format)
-                start = parse_time_to_seconds(line['start'])
-                end = parse_time_to_seconds(line['end'])
-                text = line['text'].strip()
-                speaker = line['speaker']
+                    current_seen_lines.add(line_id)
 
-                # Create a key to check if content changed (not metrics)
-                content_key = (text, start, end, speaker)
+                    # Parse time (handles both float and '0:01:23' format)
+                    start = parse_time_to_seconds(line['start'])
+                    end = parse_time_to_seconds(line['end'])
+                    text = line['text'].strip()
+                    speaker = line['speaker']
 
-                # Check if this line is now finalized (no longer in last update or content stopped changing)
-                content_changed = displayed_lines.get(line_id) != content_key
+                    # <-- Сохраняем/обновляем финальную строку в общем словаре
+                    all_finalized_lines[line_id] = (start, end, speaker, text)
 
-                if line_id not in displayed_lines:
-                    # New line - print without metrics
-                    text_line = text if speaker != -2 else "Тишина"
-                    line_display = (
-                        f"{GREEN}ID:{line_id}{RESET} "
-                        f"{start:.2f}s - {end:.2f}s "
-                        f"Speaker {speaker}: {text_line}"
-                    )
-                    print(f"\n{line_display}", end="", flush=True)
-                    displayed_lines[line_id] = content_key
-                    last_line_id = line_id
-                    if not first_token_event.is_set():
-                        first_token_event.set()
+                    # Create a key to check if content changed (not metrics)
+                    content_key = (text, start, end, speaker)
 
-                elif content_changed:
-                    # Line content changed - update without metrics
-                    text_line = text if speaker != -2 else "Тишина"
-                    line_display = (
-                        f"{GREEN}ID:{line_id}{RESET} "
-                        f"{start:.2f}s - {end:.2f}s "
-                        f"Speaker {speaker}: {text_line}"
-                    )
-                    if line_id == last_line_id:
-                        print(f"\r{line_display}", end="", flush=True)
-                    else:
+                    # Check if this line is now finalized (no longer in last update or content stopped changing)
+                    content_changed = displayed_lines.get(line_id) != content_key
+
+                    if line_id not in displayed_lines:
+                        # New line - print without metrics
+                        text_line = text if speaker != -2 else "Тишина"
+                        line_display = (
+                            f"{GREEN}ID:{line_id}{RESET} "
+                            f"{start:.2f}s - {end:.2f}s "
+                            f"Speaker {speaker}: {text_line}"
+                        )
                         print(f"\n{line_display}", end="", flush=True)
+                        displayed_lines[line_id] = content_key
                         last_line_id = line_id
-                    displayed_lines[line_id] = content_key
+                        if not first_token_event.is_set():
+                            first_token_event.set()
+
+                    elif content_changed:
+                        # Line content changed - update without metrics
+                        text_line = text if speaker != -2 else "Тишина"
+                        line_display = (
+                            f"{GREEN}ID:{line_id}{RESET} "
+                            f"{start:.2f}s - {end:.2f}s "
+                            f"Speaker {speaker}: {text_line}"
+                        )
+                        if line_id == last_line_id:
+                            print(f"\r{line_display}", end="", flush=True)
+                        else:
+                            print(f"\n{line_display}", end="", flush=True)
+                            last_line_id = line_id
+                        displayed_lines[line_id] = content_key
 
 
-            # Display buffer on the same line as the last finalized line, in gray
-            buffer_trans = resp.get("buffer_transcription", "")
+                # Display buffer on the same line as the last finalized line, in gray
+                buffer_trans = resp.get("buffer_transcription", "")
 
-            if last_line_id is not None:
-                # Get the last line text
-                content_key = displayed_lines.get(last_line_id)
-                if content_key:
-                    text, start, end, speaker = content_key
-                    text_line = text if speaker != -2 else "Тишина"
-                    last_line_text = (
-                        f"{GREEN}ID:{last_line_id}{RESET} "
-                        f"{start:.2f}s - {end:.2f}s "
-                        f"Speaker {speaker}: {text_line}"
-                    )
+                if last_line_id is not None:
+                    # Get the last line text
+                    content_key = displayed_lines.get(last_line_id)
+                    if content_key:
+                        text, start, end, speaker = content_key
+                        text_line = text if speaker != -2 else "Тишина"
+                        last_line_text = (
+                            f"{GREEN}ID:{last_line_id}{RESET} "
+                            f"{start:.2f}s - {end:.2f}s "
+                            f"Speaker {speaker}: {text_line}"
+                        )
 
-                    # Update display with buffer appended in gray (without metrics)
-                    if buffer_trans:
-                        combined = f"\r{last_line_text} {GRAY}{buffer_trans}{RESET}"
-                        print(combined, end="", flush=True)
-                        last_buffer = buffer_trans
-                    elif last_buffer:
-                        # Buffer was cleared, redraw just the line
-                        print(f"\r{last_line_text}", end="", flush=True)
-                        last_buffer = ""
+                        # Update display with buffer appended in gray (without metrics)
+                        if buffer_trans:
+                            combined = f"\r{last_line_text} {GRAY}{buffer_trans}{RESET}"
+                            print(combined, end="", flush=True)
+                            last_buffer = buffer_trans
+                        elif last_buffer:
+                            # Buffer was cleared, redraw just the line
+                            print(f"\r{last_line_text}", end="", flush=True)
+                            last_buffer = ""
 
-            if resp.get("type") == "ready_to_stop":
-                print("\n")
-                logger.info("Stream processing complete")
+                if resp.get("type") == "ready_to_stop":
+                    print("\n")
+                    logger.info("Stream processing complete")
+                    break
+
+            except websockets.exceptions.ConnectionClosedOK:
+                logger.info("Connection closed normally")
+                break
+            except Exception as e:
+                logger.error(f"Error receiving updates: {e}")
                 break
 
-        except websockets.exceptions.ConnectionClosedOK:
-            logger.info("Connection closed normally")
-            break
-        except Exception as e:
-            logger.error(f"Error receiving updates: {e}")
-            break
+    except asyncio.CancelledError: # <-- Ловим CancelledError
+        logger.info("Receiving task cancelled.")
+    finally:
+        logger.info(f"Receiving stopped. Total lines collected: {len(all_finalized_lines)}")
+        # <-- Больше не возвращаем, т.к. работали с общим словарем
 
 
-async def test_url_stream(source, host="localhost", port=8000, chunk_size=1.0, language="ru"):
+async def test_url_stream(source, host="localhost", port=8000, chunk_size=1.0, language="ru", output_file="received_audio.wav"):
     """
     Main test pipeline: read from URL stream, send to server, receive results.
 
@@ -329,6 +362,7 @@ async def test_url_stream(source, host="localhost", port=8000, chunk_size=1.0, l
         port: ASR server port
         chunk_size: Audio chunk size in seconds
         language: Language code
+        output_file: Path to save the resulting audio
     """
     uri = f"ws://{host}:{port}/asr?language={language}"
 
@@ -339,6 +373,11 @@ async def test_url_stream(source, host="localhost", port=8000, chunk_size=1.0, l
         logger.error("Failed to start audio stream reader")
         return
 
+    # <-- Инициализируем контейнеры для данных
+    # Используем список [bytearray], чтобы передать bytearray "по ссылке"
+    audio_data_container = [bytearray()]
+    final_lines_dict = {}
+
     try:
         async with websockets.connect(uri) as ws:
             logger.info(f"Connected to {uri}")
@@ -348,31 +387,73 @@ async def test_url_stream(source, host="localhost", port=8000, chunk_size=1.0, l
 
             # Start receiving results
             recv_task = asyncio.create_task(
-                receive_updates(ws, first_token_event, start_time)
+                receive_updates(ws, first_token_event, start_time, final_lines_dict)
             )
 
             # Start sending audio
             send_task = asyncio.create_task(
-                send_audio_stream(ws, stream_reader, chunk_size_s=chunk_size)
+                send_audio_stream(ws, stream_reader, audio_data_container, chunk_size_s=chunk_size)
             )
 
-            # Wait for first token
+            # --- Ждем выполнения ---
+            # Обернем в try/except, чтобы отловить отмену (Ctrl+C)
             try:
-                await asyncio.wait_for(first_token_event.wait(), timeout=30)
-            except asyncio.TimeoutError:
-                logger.warning("No transcription received within 30 seconds")
+                # Wait for first token
+                try:
+                    await asyncio.wait_for(first_token_event.wait(), timeout=30)
+                except asyncio.TimeoutError:
+                    logger.warning("No transcription received within 30 seconds")
 
-            # Wait for sending to complete
-            await send_task
+                # Ждем завершения обеих задач
+                await send_task
+                await recv_task
 
-            # Wait for all results
-            await recv_task
-
+            except asyncio.CancelledError:
+                logger.info("Main tasks cancelled. Proceeding to shutdown.")
+                # Задачи уже отменены (или отменятся), просто выходим из try
 
     except Exception as e:
-        logger.error(f"Error during test: {e}", exc_info=True)
+        # Ловим ошибки подключения и т.д.
+        if not isinstance(e, asyncio.CancelledError):
+            logger.error(f"Error during test: {e}", exc_info=True)
     finally:
+        # <-- Этот блок 'finally' выполнится ВСЕГДА:
+        # 1. При штатном завершении
+        # 2. При ошибке
+        # 3. При нажатии Ctrl+C (KeyboardInterrupt -> CancelledError)
+
+        logger.info("Stopping stream reader...")
         await stream_reader.stop()
+
+        # <-- Блок вывода результатов
+
+        # 1. Сохраняем аудио
+        audio_data = audio_data_container[0] # <-- Достаем данные из контейнера
+        if audio_data:
+            channels = stream_reader.channels
+            sample_rate = stream_reader.sample_rate
+            save_pcm_to_wav(output_file, audio_data, channels, sample_rate)
+        else:
+            logger.warning("No audio data was captured to save.")
+
+        # 2. Выводим полный текст
+        if final_lines_dict: # <-- Используем общий словарь
+            print("\n" + "="*30)
+            print("--- Final Transcription ---")
+
+            # Сортируем строки по времени начала
+            try:
+                # Сортируем по line_id, чтобы сохранить порядок
+                sorted_lines = sorted(final_lines_dict.items(), key=lambda item: item[0])
+                for line_id, (start, end, speaker, text) in sorted_lines:
+                    print(f"[{start:.2f}s - {end:.2f}s] Speaker {speaker}: {text}")
+            except Exception as e:
+                logger.error(f"Could not sort or print final lines: {e}")
+                print("Raw lines dump:", final_lines_dict)
+
+            print("="*30 + "\n")
+        else:
+            logger.warning("No final transcription lines were captured.")
 
 
 def main():
@@ -419,6 +500,13 @@ def main():
         default="ru",
         help="Language code (default: ru)"
     )
+    # <-- Новый аргумент для имени файла
+    parser.add_argument(
+        "--output_file",
+        type=str,
+        default="received_audio.wav",
+        help="File to save the received audio (default: received_audio.wav)"
+    )
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -452,9 +540,13 @@ def main():
             port=args.port,
             chunk_size=args.chunk_size,
             language=args.language,
+            output_file=args.output_file, # <-- Передаем имя файла
         ))
     except KeyboardInterrupt:
-        logger.info("\nTest interrupted by user")
+        # <-- Этот блок отловит Ctrl+C
+        # asyncio.run() при этом сам отменит задачи
+        # Блок 'finally' в test_url_stream выполнится
+        logger.info("\nTest interrupted by user. Shutting down and saving data...")
 
 
 if __name__ == "__main__":

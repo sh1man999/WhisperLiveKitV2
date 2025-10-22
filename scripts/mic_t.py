@@ -169,7 +169,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="ASR Streaming Client, you should start the Server \
             with pcm-input: whisperlivekit-server  --pcm-input")
-    parser.add_argument("--source", type=str, default=os.path.join(Path(__file__).parent, "assets", "test.flac"),
+    parser.add_argument("--source", type=str, default=os.path.join(Path(__file__).parent, "assets", "received_audio.wav"),
                         help="Audio file path or 'mic' for microphone")
     parser.add_argument("--host", type=str, default="localhost")
     parser.add_argument("--port", type=int, default=8000)
