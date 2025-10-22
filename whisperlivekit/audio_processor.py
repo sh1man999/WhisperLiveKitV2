@@ -1,9 +1,11 @@
 import asyncio
+from typing import Any, AsyncGenerator
+
 import numpy as np
-from time import time, sleep
+from time import time
 import logging
 import traceback
-from whisperlivekit.timed_objects import ASRToken, Silence, Line, FrontData, State, Transcript, ChangeSpeaker
+from whisperlivekit.timed_objects import Silence, Line, FrontData, State, Transcript, ChangeSpeaker
 from whisperlivekit.transcription_engine import TranscriptionEngine, online_diarization_factory
 from whisperlivekit.silero_vad_iterator import FixedVADIterator
 from whisperlivekit.results_formater import format_output
@@ -12,44 +14,20 @@ from whisperlivekit.whisper_streaming_custom.online_asr import OnlineASRProcesso
 
 logger = logging.getLogger(__name__)
 
-SENTINEL = object() # unique sentinel object for end of stream marker
+SENTINEL = object() # Маркер для конца потока
 
-def cut_at(cumulative_pcm, cut_sec):
-    cumulative_len = 0
-    cut_sample = int(cut_sec * 16000)
-    
-    for ind, pcm_array in enumerate(cumulative_pcm):
-        if (cumulative_len + len(pcm_array)) >= cut_sample:
-            cut_chunk = cut_sample - cumulative_len
-            before = np.concatenate(cumulative_pcm[:ind] + [cumulative_pcm[ind][:cut_chunk]])
-            after = [cumulative_pcm[ind][cut_chunk:]] + cumulative_pcm[ind+1:]
-            return before, after
-        cumulative_len += len(pcm_array)
-    return np.concatenate(cumulative_pcm), []
-
-async def get_all_from_queue(queue):
-    items = []
-    try:
-        while True:
-            item = queue.get_nowait()
-            items.append(item)
-    except asyncio.QueueEmpty:
-        pass
-    return items
 
 class AudioProcessor:
     """
-    Processes audio streams for transcription and diarization.
-    Handles audio processing, state management, and result formatting.
+    Обрабатывает аудиопотоки для транскрипции и диаризации.
+    Обеспечивает обработку аудио, управление состоянием и форматирование результатов.
     """
     
     def __init__(self,
                  transcription_engine: TranscriptionEngine,
-                 pcm_input: bool,
                  language: str = "auto",
                  url: str|None = None):
-        """Initialize the audio processor with configuration, models, and state."""
-
+        """Инициализируйте аудиопроцессор с конфигурацией, моделями и состоянием."""
         self.language = language
         self.url = url
         
@@ -59,9 +37,8 @@ class AudioProcessor:
         self.channels = 1
         self.samples_per_sec = int(self.sample_rate * self.args.min_chunk_size_sec) # Это минимальное количество сэмплов в одном чанке, которое AudioProcessor будет обрабатывать.
         self.bytes_per_sample = 2 # Почему 2? Потому что система работает со стандартным несжатым аудио-форматом PCM s16le (signed 16-bit little-endian). 16 бит — это ровно 2 байта.
-        self.bytes_per_sec = self.samples_per_sec * self.bytes_per_sample # Это минимальный размер чанка в байтах, который запускает обработку.
-        self.max_bytes_per_sec = (self.sample_rate * 2) * self.args.max_chunk_size_sec  # Это максимальный размер чанка в байтах, который система обработает за один раз. Это "потолок", который предотвращает переполнение и слишком большие задержки.
-        self.is_pcm_input = pcm_input
+        self.min_chunk_size_bytes = self.samples_per_sec * self.bytes_per_sample # Это минимальный размер чанка в байтах, который запускает обработку.
+        self.max_chunk_size_bytes = (self.sample_rate * 2) * self.args.max_chunk_size_sec  # Это максимальный размер чанка в байтах, который система обработает за один раз. Это "потолок", который предотвращает переполнение и слишком большие задержки.
 
         # State management
         self.is_stopping = False
@@ -88,13 +65,13 @@ class AudioProcessor:
         # Models and processing
         self.asr = transcription_engine.asr
         self.vac_model = transcription_engine.vac_model
-        self.vac = FixedVADIterator(transcription_engine.vac_model)
+        self.vac = FixedVADIterator(model=transcription_engine.vac_model, min_silence_duration_ms=1000, threshold=0.2) # threshold 0.2 or 0.5? min_silence_duration_ms?, speech_pad_ms 400?
                          
         self.ffmpeg_manager = None
         self.ffmpeg_reader_task = None
         self._ffmpeg_error = None
 
-        if not self.is_pcm_input or self.url:
+        if self.url:
             self.ffmpeg_manager = FFmpegManager(
                 sample_rate=self.sample_rate,
                 channels=self.channels,
@@ -103,6 +80,7 @@ class AudioProcessor:
             async def handle_ffmpeg_error(error_type: str):
                 logger.error(f"FFmpeg error: {error_type}")
                 self._ffmpeg_error = error_type
+
             self.ffmpeg_manager.on_error_callback = handle_ffmpeg_error
              
         self.transcription_queue = asyncio.Queue()
@@ -124,25 +102,34 @@ class AudioProcessor:
             logger.info(f"Это {type(self.args.diarization)} значение {self.args.diarization}")
             self.diarization = online_diarization_factory(self.args, transcription_engine.diarization_model)
 
-    def convert_pcm_to_float(self, pcm_buffer):
-        """Convert PCM buffer in s16le format to normalized NumPy array."""
+    @staticmethod
+    def convert_pcm_to_float(pcm_buffer):
+        """Преобразовать буфер PCM в формате s16le в нормализованный массив NumPy."""
         return np.frombuffer(pcm_buffer, dtype=np.int16).astype(np.float32) / 32768.0
 
-    async def add_dummy_token(self):
-        """Placeholder token when no transcription is available."""
-        async with self.lock:
-            current_time = time() - self.beg_loop
-            self.tokens.append(ASRToken(
-                start=current_time, end=current_time + 1,
-                text=".", speaker=-1, is_dummy=True
-            ))
-            
+    @staticmethod
+    def _cut_at(cumulative_pcm, cut_sec):
+        cumulative_len = 0
+        cut_sample = int(cut_sec * 16000)
+
+        for ind, pcm_array in enumerate(cumulative_pcm):
+            if (cumulative_len + len(pcm_array)) >= cut_sample:
+                cut_chunk = cut_sample - cumulative_len
+                before = np.concatenate(
+                    cumulative_pcm[:ind] + [cumulative_pcm[ind][:cut_chunk]]
+                )
+                after = [cumulative_pcm[ind][cut_chunk:]] + cumulative_pcm[ind + 1 :]
+                return before, after
+            cumulative_len += len(pcm_array)
+        return np.concatenate(cumulative_pcm), []
+
+
     async def get_current_state(self):
-        """Get current state."""
+        """Получить текущее состояние."""
         async with self.lock:
             current_time = time()
             
-            # Calculate remaining times
+            # Рассчитать оставшееся время
             remaining_transcription = 0
             if self.end_buffer > 0:
                 remaining_transcription = max(0, round(current_time - self.beg_loop - self.end_buffer, 1))
@@ -163,7 +150,7 @@ class AudioProcessor:
             )
             
     async def reset(self):
-        """Reset all state variables to initial values."""
+        """Сбросить все переменные состояния до начальных значений."""
         async with self.lock:
             self.tokens = []
             self.buffer_transcription = Transcript()
@@ -171,20 +158,20 @@ class AudioProcessor:
             self.beg_loop = time()
 
     async def ffmpeg_stdout_reader(self):
-        """Read audio data from FFmpeg stdout and process it into the PCM pipeline."""
+        """Считывает аудиоданные из stdout вывода FFmpeg и обрабатывать их в конвейере PCM."""
         beg = time()
         while True:
             try:
                 if self.is_stopping:
-                    logger.info("Stopping ffmpeg_stdout_reader due to stopping flag.")
+                    logger.info("Остановка ffmpeg_stdout_reader из-за флага остановки.")
                     break
 
                 state = await self.ffmpeg_manager.get_state() if self.ffmpeg_manager else FFmpegState.STOPPED
                 if state == FFmpegState.FAILED:
-                    logger.error("FFmpeg is in FAILED state, cannot read data")
+                    logger.error("FFmpeg находится в состоянии FAILED, не может прочитать данные")
                     break
                 elif state == FFmpegState.STOPPED:
-                    logger.info("FFmpeg is stopped")
+                    logger.info("FFmpeg остановлен")
                     break
                 elif state != FFmpegState.RUNNING:
                     await asyncio.sleep(0.1)
@@ -192,47 +179,47 @@ class AudioProcessor:
 
                 current_time = time()
                 elapsed_time = max(0.0, current_time - beg)
-                buffer_size = max(int(32000 * elapsed_time), 4096)  # dynamic read
+                buffer_size = max(int((self.sample_rate * self.bytes_per_sample) * elapsed_time), 4096)  # dynamic read
                 beg = current_time
 
                 chunk = await self.ffmpeg_manager.read_data(buffer_size)
                 if not chunk:
-                    # No data currently available
-                    logger.info(f"FFmpeg returned empty chunk (timeout or end of stream)")
+                    # В настоящее время данные отсутствуют.
+                    logger.info(f"FFmpeg вернул пустой фрагмент (тайм-аут или конец потока)")
                     await asyncio.sleep(0.05)
                     continue
 
                 self.pcm_buffer.extend(chunk)
 
-                # Log only when buffer reaches processing threshold
-                if len(self.pcm_buffer) >= self.bytes_per_sec:
-                    logger.info(f"Buffer ready for processing: {len(self.pcm_buffer)} bytes ({len(self.pcm_buffer) / self.bytes_per_sec:.2f}s)")
+                # Только тогда, когда буфер достигает порога обработки
+                if len(self.pcm_buffer) >= self.min_chunk_size_bytes:
+                    logger.info(f"Буфер готов к обработке: {len(self.pcm_buffer)} bytes ({len(self.pcm_buffer) / self.min_chunk_size_bytes:.2f}s)")
 
                 await self.handle_pcm_data()
 
             except asyncio.CancelledError:
-                logger.info("ffmpeg_stdout_reader cancelled.")
+                logger.info("ffmpeg_stdout_reader отменен.")
                 break
             except Exception as e:
-                logger.warning(f"Exception in ffmpeg_stdout_reader: {e}")
+                logger.warning(f"Исключение в ffmpeg_stdout_reader: {e}")
                 logger.debug(f"Traceback: {traceback.format_exc()}")
                 await asyncio.sleep(0.2)
 
-        logger.info("FFmpeg stdout processing finished. Signaling downstream processors if needed.")
+        logger.info("FFmpeg обработка stdout завершена. При необходимости отправляется сигнал нижестоящим процессорам.")
         if not self.diarization_before_transcription and self.transcription_queue:
             await self.transcription_queue.put(SENTINEL)
         if self.diarization:
             await self.diarization_queue.put(SENTINEL)
 
     async def transcription_processor(self):
-        """Process audio chunks for transcription."""
+        """Обработка аудиофрагментов для транскрипции."""
         cumulative_pcm_duration_stream_time = 0.0
         
         while True:
             try:
                 item = await self.transcription_queue.get()
                 if item is SENTINEL:
-                    logger.debug("Transcription processor received sentinel. Finishing.")
+                    logger.debug("Процессор транскрипции получил сигнал. Завершение...")
                     self.transcription_queue.task_done()
                     break
 
@@ -294,15 +281,15 @@ class AudioProcessor:
                     self.transcription_queue.task_done()
         
         if self.is_stopping:
-            logger.info("Transcription processor finishing due to stopping flag.")
+            logger.info("Процессор транскрипции завершен из-за флага остановки.")
             if self.diarization_queue:
                 await self.diarization_queue.put(SENTINEL)
 
-        logger.info("Transcription processor task finished.")
+        logger.info("Задача процессора транскрипции завершена.")
 
 
     async def diarization_processor(self, diarization_obj):
-        """Process audio chunks for speaker diarization."""
+        """Обрабатывает аудиофрагменты для диаризации говорящих."""
         if self.diarization_before_transcription:
             self.current_speaker = 0
             await self.transcription_queue.put(ChangeSpeaker(speaker=self.current_speaker, start=0.0))
@@ -310,7 +297,7 @@ class AudioProcessor:
             try:
                 item = await self.diarization_queue.get()
                 if item is SENTINEL:
-                    logger.debug("Diarization processor received sentinel. Finishing.")
+                    logger.debug("Процессор диаризации получил сигнал тревоги. Завершение.")
                     self.diarization_queue.task_done()
                     break
                 elif type(item) is Silence:
@@ -333,20 +320,20 @@ class AudioProcessor:
                         last_segment = segments[-1]                    
                         if last_segment.speaker != self.current_speaker:
                             cut_sec = last_segment.start - self.last_end
-                            to_transcript, self.cumulative_pcm = cut_at(self.cumulative_pcm, cut_sec)
+                            to_transcript, self.cumulative_pcm = self._cut_at(self.cumulative_pcm, cut_sec)
                             await self.transcription_queue.put(to_transcript)
                             
                             self.current_speaker = last_segment.speaker
                             await self.transcription_queue.put(ChangeSpeaker(speaker=self.current_speaker, start=last_segment.start))
                             
                             cut_sec = last_segment.end - last_segment.start
-                            to_transcript, self.cumulative_pcm = cut_at(self.cumulative_pcm, cut_sec)
+                            to_transcript, self.cumulative_pcm = self._cut_at(self.cumulative_pcm, cut_sec)
                             await self.transcription_queue.put(to_transcript)                            
                             self.last_start = last_segment.start
                             self.last_end = last_segment.end
                         else:
                             cut_sec = last_segment.end - self.last_end
-                            to_transcript, self.cumulative_pcm = cut_at(self.cumulative_pcm, cut_sec)
+                            to_transcript, self.cumulative_pcm = self._cut_at(self.cumulative_pcm, cut_sec)
                             await self.transcription_queue.put(to_transcript)
                             self.last_end = last_segment.end
                 elif not self.diarization_before_transcription:           
@@ -364,10 +351,10 @@ class AudioProcessor:
                 logger.warning(f"Traceback: {traceback.format_exc()}")
                 if 'pcm_array' in locals() and pcm_array is not SENTINEL:
                     self.diarization_queue.task_done()
-        logger.info("Diarization processor task finished.")
+        logger.info("Задача процессора диаризации завершена.")
 
     async def results_formatter(self):
-        """Format processing results for output."""
+        """Format результаты обработки для вывода."""
         while True:
             try:
                 if self._ffmpeg_error:
@@ -422,7 +409,7 @@ class AudioProcessor:
                     yield response
                     self.last_response_content = response
                 
-                # Check for termination condition
+                # Проверка на наличие условий завершения
                 if self.is_stopping:
                     all_processors_done = True
                     if self.args.transcription and self.transcription_task and not self.transcription_task.done():
@@ -431,7 +418,7 @@ class AudioProcessor:
                         all_processors_done = False
                     
                     if all_processors_done:
-                        logger.info("Results formatter: All upstream processors are done and in stopping state. Terminating.")
+                        logger.info("results_formater: Все вышестоящие процессоры завершены и находятся в состоянии остановки. Завершение.")
                         return
                 
                 await asyncio.sleep(0.05)
@@ -441,20 +428,20 @@ class AudioProcessor:
                 logger.warning(f"Traceback: {traceback.format_exc()}")
                 await asyncio.sleep(0.5)
         
-    async def create_tasks(self):
+    async def create_tasks(self)-> AsyncGenerator[FrontData, Any]:
         """Create and start processing tasks."""
         self.all_tasks_for_cleanup = []
         processing_tasks_for_watchdog = []
 
         # If using FFmpeg (non-PCM input), start it and spawn stdout reader
-        if not self.is_pcm_input or self.url:
+        if self.url:
             success = await self.ffmpeg_manager.start()
             if not success:
-                logger.error("Failed to start FFmpeg manager")
+                logger.error("Не удалось запустить менеджер FFmpeg")
                 async def error_generator():
                     yield FrontData(
                         status="error",
-                        error="FFmpeg failed to start. Please check that FFmpeg is installed."
+                        error="Не удалось запустить FFmpeg. Проверьте, установлен ли FFmpeg."
                     )
                 return error_generator()
             self.ffmpeg_reader_task = asyncio.create_task(self.ffmpeg_stdout_reader())
@@ -471,7 +458,7 @@ class AudioProcessor:
             self.all_tasks_for_cleanup.append(self.diarization_task)
             processing_tasks_for_watchdog.append(self.diarization_task)
         
-        # Monitor overall system health
+        # Мониторинг общего состояния системы
         self.watchdog_task = asyncio.create_task(self.watchdog(processing_tasks_for_watchdog))
         self.all_tasks_for_cleanup.append(self.watchdog_task)
         
@@ -488,19 +475,19 @@ class AudioProcessor:
                         exc = task.exception()
                         task_name = task.get_name() if hasattr(task, 'get_name') else f"Monitored Task {i}"
                         if exc:
-                            logger.error(f"{task_name} unexpectedly completed with exception: {exc}")
+                            logger.error(f"{task_name} неожиданно завершено с исключением: {exc}")
                         else:
-                            logger.info(f"{task_name} completed normally.")
+                            logger.info(f"{task_name} завершено нормально.")
                     
             except asyncio.CancelledError:
-                logger.info("Watchdog task cancelled.")
+                logger.info("Watchdog task отменено.")
                 break
             except Exception as e:
-                logger.error(f"Error in watchdog task: {e}", exc_info=True)
+                logger.error(f"Ошибка в watchdog task: {e}", exc_info=True)
         
     async def cleanup(self):
         """Clean up resources when processing is complete."""
-        logger.info("Starting cleanup of AudioProcessor resources.")
+        logger.info("Начинается очистка ресурсов AudioProcessor.")
         self.is_stopping = True
         for task in self.all_tasks_for_cleanup:
             if task and not task.done():
@@ -509,27 +496,27 @@ class AudioProcessor:
         created_tasks = [t for t in self.all_tasks_for_cleanup if t]
         if created_tasks:
             await asyncio.gather(*created_tasks, return_exceptions=True)
-        logger.info("All processing tasks cancelled or finished.")
+        logger.info("Все задачи по обработке отменены или завершены.")
 
         if self.ffmpeg_manager:
             try:
                 await self.ffmpeg_manager.stop()
-                logger.info("FFmpeg manager stopped.")
+                logger.info("Менеджер FFmpeg остановлен.")
             except Exception as e:
-                logger.warning(f"Error stopping FFmpeg manager: {e}")
+                logger.warning(f"Ошибка остановки менеджера FFmpeg: {e}")
         if self.diarization:
             self.diarization.close()
-        logger.info("AudioProcessor cleanup complete.")
+        logger.info("Очистка AudioProcessor завершена.")
 
 
     async def process_audio(self, message):
-        """Process incoming audio data."""
+        """Обработка входящих аудиоданных."""
 
         if not self.beg_loop:
             self.beg_loop = time()
 
         if not message:
-            logger.info("Empty audio message received, initiating stop sequence.")
+            logger.info("Получено пустое звуковое сообщение, инициируется последовательность остановки.")
             self.is_stopping = True
              
             if self.transcription_queue:
@@ -541,40 +528,33 @@ class AudioProcessor:
             return
 
         if self.is_stopping:
-            logger.warning("AudioProcessor is stopping. Ignoring incoming audio.")
+            logger.warning("AudioProcessor останавливается. Игнорирует входящий звук.")
             return
 
-        if self.is_pcm_input and not self.url:
-            self.pcm_buffer.extend(message)
-            await self.handle_pcm_data()
-        if self.ffmpeg_manager and not self.url:
-            success = await self.ffmpeg_manager.write_data(message)
-            if not success:
-                ffmpeg_state = await self.ffmpeg_manager.get_state()
-                if ffmpeg_state == FFmpegState.FAILED:
-                    logger.error("FFmpeg is in FAILED state, cannot process audio")
-                else:
-                    logger.warning("Failed to write audio data to FFmpeg")
+        self.pcm_buffer.extend(message)
+        await self.handle_pcm_data()
 
     async def handle_pcm_data(self):
-        # Process when enough data
-        buffer_duration = len(self.pcm_buffer) / self.bytes_per_sec
-        required_duration = self.bytes_per_sec / self.bytes_per_sec  # Always 1.0
+        # Процесс, когда достаточно данных
+        buffer_duration = len(self.pcm_buffer) / self.min_chunk_size_bytes
+        required_duration = self.min_chunk_size_bytes / self.min_chunk_size_bytes  # Always 1.0
 
-        # "Если в нашем буфере pcm_buffer накоплено меньше, чем 16000 байт (т.е. меньше 0.5 сек аудио), то ничего не делаем и ждем, пока данных не накопится больше
-        if len(self.pcm_buffer) < self.bytes_per_sec:
-            logger.debug(f"Buffer: {buffer_duration:.2f}s / {required_duration:.2f}s - waiting for more data")
+        # Если в нашем буфере pcm_buffer накоплено меньше, чем self.min_chunk_size_bytes байт т.е. меньше (например 0.5) сек аудио, то ничего не делаем и ждем, пока данных не накопится больше
+        if len(self.pcm_buffer) < self.min_chunk_size_bytes:
+            logger.debug(f"Буфер: {buffer_duration:.2f}s / {required_duration:.2f}s - ждем больше данных")
             return
 
-        if len(self.pcm_buffer) > self.max_bytes_per_sec:
+        if len(self.pcm_buffer) > self.max_chunk_size_bytes:
             logger.warning(
-                f"Audio buffer too large: {len(self.pcm_buffer) / self.bytes_per_sec:.2f}s. "
-                f"Consider using a smaller model."
+                f"Аудиобуфер слишком большой: {len(self.pcm_buffer) / self.min_chunk_size_bytes:.2f}s. "
+                f"Рассмотрите возможность использования модели меньшего размера."
             )
 
+        """
         # Если в буфере накопилось очень много данных (например, 10 секунд), не пытаться обработать их все сразу.
         # Взять на обработку только (например 5 секунд), а остальное оставить в буфере до следующего раза
-        chunk_size = min(len(self.pcm_buffer), self.max_bytes_per_sec)
+        """
+        chunk_size = min(len(self.pcm_buffer), self.max_chunk_size_bytes)
         aligned_chunk_size = (chunk_size // self.bytes_per_sample) * self.bytes_per_sample
         
         if aligned_chunk_size == 0:

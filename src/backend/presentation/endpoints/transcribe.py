@@ -12,35 +12,32 @@ transcribe_router = APIRouter()
 logger = logging.getLogger(__name__)
 
 async def handle_websocket_results(websocket, results_generator):
-    """Consumes results from the audio processor and sends them via WebSocket."""
+    """Получает результаты от аудиопроцессора и отправляет их через WebSocket."""
     try:
         async for response in results_generator:
             await websocket.send_json(response.to_dict())
-        # when the results_generator finishes it means all audio has been processed
-        logger.info("Results generator finished. Sending 'ready_to_stop' to client.")
+        logger.info("Генератор результатов завершён. Отправляю клиенту сообщение «ready_to_stop».")
         await websocket.send_json({"type": "ready_to_stop"})
     except WebSocketDisconnect:
-        logger.info("WebSocket disconnected while handling results (client likely closed connection).")
+        logger.info("WebSocket отключился во время обработки результатов (вероятно, клиент закрыл соединение).")
     except Exception as e:
-        logger.exception(f"Error in WebSocket results handler: {e}")
+        logger.exception(f"Ошибка в обработчике результатов WebSocket: {e}")
 
 @transcribe_router.websocket("/asr")
 @inject
 async def transcribe(websocket: WebSocket, transcription_engine: FromDishka[TranscriptionEngine]):
     await websocket.accept()
-    pcm_input = True # декодирование аудио на стороне клиента
-    logger.info("WebSocket connection opened.")
+    logger.info("WebSocket-соединение открыто.")
     language = websocket.query_params.get("language", "auto")
     url = websocket.query_params.get("url")
     try:
-        await websocket.send_json({"type": "config", "useAudioWorklet": pcm_input})
+        await websocket.send_json({"type": "config"})
     except Exception as e:
-        logger.warning(f"Failed to send config to client: {e}")
+        logger.warning(f"Не удалось отправить конфигурацию клиенту: {e}")
     audio_processor = AudioProcessor(
         transcription_engine=transcription_engine,
         language=language,
-        url=url,
-        pcm_input=pcm_input
+        url=url
     )
     results_generator = await audio_processor.create_tasks()
     websocket_task = asyncio.create_task(
@@ -49,37 +46,35 @@ async def transcribe(websocket: WebSocket, transcription_engine: FromDishka[Tran
 
     try:
         if url:
-            # For URL transcription, the AudioProcessor handles fetching and processing.
-            # We just need to wait for the results_generator to complete.
             await websocket_task
         else:
-            # For live audio input, continue receiving bytes from the client.
+            # Для live audio input, продолжайте получать байты от клиента.
             while True:
                 message = await websocket.receive_bytes()
                 await audio_processor.process_audio(message)
     except KeyError as e:
         if "bytes" in str(e):
-            logger.warning("Client has closed the connection.")
+            logger.warning("Клиент закрыл соединение.")
         else:
             logger.error(
-                f"Unexpected KeyError in websocket_endpoint: {e}", exc_info=True
+                f"Неожиданная ошибка KeyError в websocket_endpoint: {e}", exc_info=True
             )
     except WebSocketDisconnect:
-        logger.info("WebSocket disconnected by client during message receiving loop.")
+        logger.info("WebSocket был отключен клиентом во время цикла получения сообщений.")
     except Exception as e:
         logger.error(
-            f"Unexpected error in websocket_endpoint main loop: {e}", exc_info=True
+            f"Неожиданная ошибка в основном цикле websocket_endpoint: {e}", exc_info=True
         )
     finally:
-        logger.info("Cleaning up WebSocket endpoint...")
+        logger.info("Очистка конечной точки WebSocket...")
         if not websocket_task.done():
             websocket_task.cancel()
         try:
             await websocket_task
         except asyncio.CancelledError:
-            logger.info("WebSocket results handler task was cancelled.")
+            logger.info("Задача обработчика результатов WebSocket была отменена.")
         except Exception as e:
-            logger.warning(f"Exception while awaiting websocket_task completion: {e}")
+            logger.warning(f"Исключение при ожидании завершения websocket_task: {e}")
 
         await audio_processor.cleanup()
-        logger.info("WebSocket endpoint cleaned up successfully.")
+        logger.info("Конечная точка WebSocket успешно очищена.")

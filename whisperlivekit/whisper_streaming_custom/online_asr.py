@@ -8,12 +8,12 @@ logger = logging.getLogger(__name__)
 
 class HypothesisBuffer:
     """
-    Buffer to store and process ASR hypothesis tokens.
+    Буфер для хранения и обработки токенов гипотез ASR.
 
-    It holds:
-      - committed_in_buffer: tokens that have been confirmed (committed)
-      - buffer: the last hypothesis that is not yet committed
-      - new: new tokens coming from the recognizer
+    Он содержит:
+    - commited_in_buffer: токены, которые были подтверждены (закомичены);
+    - buffer: последняя гипотеза, которая еще не закомичена;
+    - new: новые токены, поступающие от распознавателя.
     """
     def __init__(self, logfile=sys.stderr, confidence_validation=False):
         self.confidence_validation = confidence_validation
@@ -25,14 +25,12 @@ class HypothesisBuffer:
         self.logfile = logfile
 
     def insert(self, new_tokens: List[ASRToken], offset: float):
+        """Вставляет новые токены (после применения временного смещения) и сравните их с
+        уже зафиксированными токенами. Добавляются только токены, расширяющие зафиксированную гипотезу.
         """
-        Insert new tokens (after applying a time offset) and compare them with the 
-        already committed tokens. Only tokens that extend the committed hypothesis 
-        are added.
-        """
-        # Apply the offset to each token.
+        # Применить смещение к каждому токену.
         new_tokens = [token.with_offset(offset) for token in new_tokens]
-        # Only keep tokens that are roughly “new”
+        # Сохраняет только те токены, которые являются примерно «новыми».
         self.new = [token for token in new_tokens if token.start > self.last_committed_time - 0.1]
 
         if self.new:
@@ -55,10 +53,7 @@ class HypothesisBuffer:
                             break
 
     def flush(self) -> List[ASRToken]:
-        """
-        Returns the committed chunk, defined as the longest common prefix
-        between the previous hypothesis and the new tokens.
-        """
+        """Возвращает закомиченные чанки, определяемый как самый длинный общий префикс между предыдущей гипотезой и новыми токенами."""
         committed: List[ASRToken] = []
         while self.new:
             current_new = self.new[0]
@@ -84,23 +79,18 @@ class HypothesisBuffer:
         return committed
 
     def pop_committed(self, time: float):
-        """
-        Remove tokens (from the beginning) that have ended before `time`.
-        """
+        """Удалить токены (с начала), которые закончились до `time`."""
         while self.committed_in_buffer and self.committed_in_buffer[0].end <= time:
             self.committed_in_buffer.pop(0)
 
 
 
 class OnlineASRProcessor:
-    """
-    Processes incoming audio in a streaming fashion, calling the ASR system
-    periodically, and uses a hypothesis buffer to commit and trim recognized text.
-    
-    The processor supports two types of buffer trimming:
-      - "sentence": trims at sentence boundaries (using a sentence tokenizer)
-      - "segment": trims at fixed segment durations.
-    """
+    """Обрабатывает входящий аудиосигнал потоковым способом, периодически обращаясь к системе автоматического распознавания речи (ASR), и использует буфер гипотез для фиксации и обрезки распознанного текста.
+    Процессор поддерживает два типа обрезки буфера:
+    - sentence: обрезка по границам предложений (с использованием токенизатора предложений)
+    - segment: обрезка по фиксированной длительности сегментов.
+        """
     SAMPLING_RATE = 16000
 
     def __init__(
@@ -108,12 +98,9 @@ class OnlineASRProcessor:
         asr,
         logfile=sys.stderr,
     ):
-        """
-        asr: An ASR system object (for example, a WhisperASR instance) that
-             provides a `transcribe` method, a `ts_words` method (to extract tokens),
-             a `segments_end_ts` method, and a separator attribute `sep`.
-        tokenize_method: A function that receives text and returns a list of sentence strings.
-        buffer_trimming: A tuple (option, seconds), where option is either "sentence" or "segment".
+        """asr: например экземпляр WhisperASR, который предоставляет метод `transcribe`, метод `ts_words` (для извлечения токенов), метод `segments_end_ts` и атрибут `sep`.
+        tokenize_method: Функция, которая получает текст и возвращает список строк предложений.
+        buffer_trimming: Кортеж (параметр, секунды), где параметр может быть либо sentence, либо segment.
         """
         self.asr = asr
         self.tokenize = asr.tokenizer
@@ -126,16 +113,16 @@ class OnlineASRProcessor:
         self.buffer_trimming_sec = asr.buffer_trimming_sec
 
         if self.buffer_trimming_way not in ["sentence", "segment"]:
-            raise ValueError("buffer_trimming must be either 'sentence' or 'segment'")
+            raise ValueError("buffer_trimming должен быть либо 'sentence', либо 'segment'")
         if self.buffer_trimming_sec <= 0:
-            raise ValueError("buffer_trimming_sec must be positive")
+            raise ValueError("buffer_trimming_sec должен быть положительным")
         elif self.buffer_trimming_sec > 30:
             logger.warning(
-                f"buffer_trimming_sec is set to {self.buffer_trimming_sec}, which is very long. It may cause OOM."
+                f"buffer_trimming_sec установлен на {self.buffer_trimming_sec}, Это очень долго. Это может вызвать ООМ."
             )
 
     def init(self, offset: Optional[float] = None):
-        """Initialize or reset the processing buffers."""
+        """Инициализирует или сбросывает буферы обработки."""
         self.audio_buffer = np.array([], dtype=np.float32)
         self.transcript_buffer = HypothesisBuffer(logfile=self.logfile, confidence_validation=self.confidence_validation)
         self.buffer_time_offset = offset if offset is not None else 0.0
@@ -144,16 +131,16 @@ class OnlineASRProcessor:
         self.time_of_last_asr_output = 0.0
 
     def get_audio_buffer_end_time(self) -> float:
-        """Returns the absolute end time of the current audio_buffer."""
+        """Возвращает абсолютное время окончания текущего audio_buffer."""
         return self.buffer_time_offset + (len(self.audio_buffer) / self.SAMPLING_RATE)
 
     def insert_audio_chunk(self, audio: np.ndarray, audio_stream_end_time: Optional[float] = None):
-        """Append an audio chunk (a numpy array) to the current audio buffer."""
+        """Добавить аудио чанк (массив numpy) к текущему аудиобуферу."""
         self.audio_buffer = np.append(self.audio_buffer, audio)
 
     def insert_silence(self, silence_duration, offset):
         """
-        If silences are > 5s, we do a complete context clear. Otherwise, we just insert a small silence and shift the last_attend_frame
+        Если пауза длится более 3 секунд, мы полностью очищаем контекст. В противном случае мы просто вставляем небольшую паузу и сдвигаем last_attend_frame.
         """
         # if self.transcript_buffer.buffer:
         #     self.committed.extend(self.transcript_buffer.buffer)
@@ -168,10 +155,9 @@ class OnlineASRProcessor:
 
     def prompt(self) -> Tuple[str, str]:
         """
-        Returns a tuple: (prompt, context), where:
-          - prompt is a 200-character suffix of committed text that falls 
-            outside the current audio buffer.
-          - context is the committed text within the current audio buffer.
+        Возвращает кортеж: (prompt, context), где:
+        - prompt — это 200-символьный суффикс закомиченного текста, который находится за пределами текущего аудиобуфера.
+        - context — это зафиксированный текст в текущем аудиобуфере.
         """
         k = len(self.committed)
         while k > 0 and self.committed[k - 1].end > self.buffer_time_offset:
@@ -181,7 +167,7 @@ class OnlineASRProcessor:
         prompt_words = [token.text for token in prompt_tokens]
         prompt_list = []
         length_count = 0
-        # Use the last words until reaching 200 characters.
+        # Используйте последние слова, пока не достигнете 200 символов.
         while prompt_words and length_count < 200:
             word = prompt_words.pop(-1)
             length_count += len(word) + 1
@@ -191,24 +177,21 @@ class OnlineASRProcessor:
         return self.asr.sep.join(prompt_list[::-1]), context_text
 
     def get_buffer(self):
-        """
-        Get the unvalidated buffer in string format.
-        """
+        """Получить непроверенный буфер в строковом формате."""
         return self.concatenate_tokens(self.transcript_buffer.buffer)
         
 
     def process_iter(self, language: str = None) -> Tuple[List[ASRToken], float]:
-        """
-        Processes the current audio buffer.
-
-        Returns a tuple: (list of committed ASRToken objects, float representing the audio processed up to time).
+        """Обрабатывает текущий аудиобуфер.
+        Возвращает кортеж: (список закомиченных ASRToken, float представляющее обработанный на данный момент аудио).
         """
         current_audio_processed_upto = self.get_audio_buffer_end_time()
         prompt_text, _ = self.prompt()
-        logger.info(
+        logger.debug(
             f"Transcribing {len(self.audio_buffer)/self.SAMPLING_RATE:.2f} seconds from {self.buffer_time_offset:.2f}"
         )
         res = self.asr.transcribe(self.audio_buffer, init_prompt=prompt_text, language=language)
+        #logger.info(f"{res=}")
         tokens = self.asr.ts_words(res)
         self.transcript_buffer.insert(tokens, self.buffer_time_offset)
         committed_tokens = self.transcript_buffer.flush()
@@ -219,18 +202,18 @@ class OnlineASRProcessor:
 
         completed = self.concatenate_tokens(committed_tokens)
         # Текст подтвержден - это тот текст, который он окончательно "зафиксировал" и который уже не изменится.
-        logger.info(f"Текст подтвержден: {completed.text}")
+        logger.debug(f"Текст подтвержден: {completed.text}")
         incomp = self.concatenate_tokens(self.transcript_buffer.buffer)
         # Неподтвержденный - это текст, который он только начал печатать. Он может его исправить, удалить или переписать в следующую секунду. Это "черновик" или "хвост" гипотезы.
-        logger.info(f"Неподтвержденный: {incomp.text}")
+        logger.debug(f"Неподтвержденный: {incomp.text}")
 
         buffer_duration = len(self.audio_buffer) / self.SAMPLING_RATE
         if not committed_tokens and buffer_duration > self.buffer_trimming_sec:
             time_since_last_output = self.get_audio_buffer_end_time() - self.time_of_last_asr_output
             if time_since_last_output > self.buffer_trimming_sec:
                 logger.warning(
-                    f"No ASR output for {time_since_last_output:.2f}s. "
-                    f"Resetting buffer to prevent freezing."
+                    f"Нет данных от ASR {time_since_last_output:.2f}s. "
+                    f"Сброс буфера для предотвращения зависания."
                 )
                 self.init(offset=self.get_audio_buffer_end_time())
                 return [], current_audio_processed_upto
@@ -244,7 +227,7 @@ class OnlineASRProcessor:
             self.chunk_completed_segment(res)
             logger.debug("Chunking segment")
         logger.debug(
-            f"Length of audio buffer now: {len(self.audio_buffer)/self.SAMPLING_RATE:.2f} seconds"
+            f"Длина аудиобуфера сейчас: {len(self.audio_buffer)/self.SAMPLING_RATE:.2f} секунды"
         )
         if self.global_time_offset:
             for token in committed_tokens:
@@ -253,19 +236,18 @@ class OnlineASRProcessor:
 
     def chunk_completed_sentence(self):
         """
-        If the committed tokens form at least two sentences, chunk the audio
-        buffer at the end time of the penultimate sentence.
-        Also ensures chunking happens if audio buffer exceeds a time limit.
+        Если закомиченные токены образуют как минимум два предложения, аудиобуфер делится на чанки в момент окончания предпоследнего предложения.
+        Также гарантируется деление на чанки, если аудиобуфер превышает ограничение по времени.
         """
         buffer_duration = len(self.audio_buffer) / self.SAMPLING_RATE        
         if not self.committed:
             if buffer_duration > self.buffer_trimming_sec:
                 chunk_time = self.buffer_time_offset + (buffer_duration / 2)
-                logger.debug(f"--- No speech detected, forced chunking at {chunk_time:.2f}")
+                logger.debug(f"--- Речь не обнаружена, принудительное разделение на фрагменты {chunk_time:.2f}")
                 self.chunk_at(chunk_time)
             return
         
-        logger.debug("COMPLETED SENTENCE: " + " ".join(token.text for token in self.committed))
+        logger.debug("ЗАВЕРШЕННОЕ ПРЕДЛОЖЕНИЕ: " + " ".join(token.text for token in self.committed))
         sentences = self.words_to_sentences(self.committed)
         for sentence in sentences:
             logger.debug(f"\tSentence: {sentence.text}")
@@ -275,73 +257,70 @@ class OnlineASRProcessor:
             while len(sentences) > 2:
                 sentences.pop(0)
             chunk_time = sentences[-2].end
-            logger.debug(f"--- Sentence chunked at {chunk_time:.2f}")
+            logger.debug(f"--- Предложение разбито на чанки {chunk_time:.2f}")
             self.chunk_at(chunk_time)
             chunk_done = True
         
         if not chunk_done and buffer_duration > self.buffer_trimming_sec:
             last_committed_time = self.committed[-1].end
-            logger.debug(f"--- Not enough sentences, chunking at last committed time {last_committed_time:.2f}")
+            logger.debug(f"--- Недостаточно предложений, разделение на чанки в последний выделенный момент {last_committed_time:.2f}")
             self.chunk_at(last_committed_time)
 
     def chunk_completed_segment(self, res):
         """
-        Chunk the audio buffer based on segment-end timestamps reported by the ASR.
-        Also ensures chunking happens if audio buffer exceeds a time limit.
+        Разделение аудиобуфера на segment-end на основе временных меток конца сегмента, полученных от ASR.
+        Также гарантирует разделение на чанки, если аудиобуфер превышает ограничение по времени.
         """
         buffer_duration = len(self.audio_buffer) / self.SAMPLING_RATE        
         if not self.committed:
             if buffer_duration > self.buffer_trimming_sec:
                 chunk_time = self.buffer_time_offset + (buffer_duration / 2)
-                logger.debug(f"--- No speech detected, forced chunking at {chunk_time:.2f}")
+                logger.debug(f"--- Речь не обнаружена, принудительное разделение на фрагменты {chunk_time:.2f}")
                 self.chunk_at(chunk_time)
             return
         
-        logger.debug("Processing committed tokens for segmenting")
+        logger.debug("Обработка выделенных токенов для сегментации")
         ends = self.asr.segments_end_ts(res)
         last_committed_time = self.committed[-1].end        
         chunk_done = False
         if len(ends) > 1:
-            logger.debug("Multiple segments available for chunking")
+            logger.debug("Доступно несколько сегментов для разделения на чанки")
             e = ends[-2] + self.buffer_time_offset
             while len(ends) > 2 and e > last_committed_time:
                 ends.pop(-1)
                 e = ends[-2] + self.buffer_time_offset
             if e <= last_committed_time:
-                logger.debug(f"--- Segment chunked at {e:.2f}")
+                logger.debug(f"--- Сегмент разделен на чанки {e:.2f}")
                 self.chunk_at(e)
                 chunk_done = True
             else:
-                logger.debug("--- Last segment not within committed area")
+                logger.debug("--- Последний сегмент не в пределах выделенной области")
         else:
-            logger.debug("--- Not enough segments to chunk")
+            logger.debug("--- Недостаточно сегментов для разбиения на чанки")
         
         if not chunk_done and buffer_duration > self.buffer_trimming_sec:
-            logger.debug(f"--- Buffer too large, chunking at last committed time {last_committed_time:.2f}")
+            logger.debug(f"--- Буфер слишком большой, фрагментация происходит в последний зафиксированный момент времени {last_committed_time:.2f}")
             self.chunk_at(last_committed_time)
         
-        logger.debug("Segment chunking complete")
+        logger.debug("Разделение сегмента завершено")
         
     def chunk_at(self, time: float):
-        """
-        Trim both the hypothesis and audio buffer at the given time.
-        """
-        logger.debug(f"Chunking at {time:.2f}s")
+        """Обрежет как гипотезу, так и аудиобуфер в заданное время."""
+        logger.debug(f"Разделение на чанки {time:.2f}s")
         logger.debug(
-            f"Audio buffer length before chunking: {len(self.audio_buffer)/self.SAMPLING_RATE:.2f}s"
+            f"Длина аудиобуфера перед разделением на фрагменты: {len(self.audio_buffer)/self.SAMPLING_RATE:.2f}s"
         )
         self.transcript_buffer.pop_committed(time)
         cut_seconds = time - self.buffer_time_offset
         self.audio_buffer = self.audio_buffer[int(cut_seconds * self.SAMPLING_RATE):]
         self.buffer_time_offset = time
         logger.debug(
-            f"Audio buffer length after chunking: {len(self.audio_buffer)/self.SAMPLING_RATE:.2f}s"
+            f"Длина аудиобуфера после разбиения на фрагменты: {len(self.audio_buffer)/self.SAMPLING_RATE:.2f}s"
         )
 
     def words_to_sentences(self, tokens: List[ASRToken]) -> List[Sentence]:
         """
-        Converts a list of tokens to a list of Sentence objects using the provided
-        sentence tokenizer.
+        Преобразует список токенов в список объектов Sentence, используя предоставленный токенизатор предложений.
         """
         if not tokens:
             return []
@@ -352,7 +331,7 @@ class OnlineASRProcessor:
             try:
                 sentence_texts = self.tokenize(full_text)
             except Exception as e:
-                # Some tokenizers (e.g., MosesSentenceSplitter) expect a list input.
+                # Некоторые токенизаторы (например, MosesSentenceSplitter) ожидают ввода списка.
                 try:
                     sentence_texts = self.tokenize([full_text])
                 except Exception as e2:
@@ -368,7 +347,7 @@ class OnlineASRProcessor:
                 continue
             sent_tokens = []
             accumulated = ""
-            # Accumulate tokens until roughly matching the length of the sentence text.
+            # Накапливайте токены до тех пор, пока их длина не будет примерно соответствовать длине текста предложения.
             while token_index < len(tokens) and len(accumulated) < len(sent_text):
                 token = tokens[token_index]
                 accumulated = (accumulated + " " + token.text).strip() if accumulated else token.text
@@ -385,8 +364,8 @@ class OnlineASRProcessor:
     
     def finish(self) -> Tuple[List[ASRToken], float]:
         """
-        Flush the remaining transcript when processing ends.
-        Returns a tuple: (list of remaining ASRToken objects, float representing the final audio processed up to time).
+        Сбросить оставшейся transcript после завершения обработки.
+        Возвращает кортеж: (список оставшихся объектов ASRToken, float представляющее собой последний обработанный аудиофайл).
         """
         remaining_tokens = self.transcript_buffer.buffer
         logger.debug(f"Final non-committed tokens: {remaining_tokens}")

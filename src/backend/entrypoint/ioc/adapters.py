@@ -39,10 +39,10 @@ class TranscriptionProvider(Provider):
             cpu_threads=config.whisper.cpu_threads,
             num_workers=config.whisper.num_workers,
             compute_type=config.whisper.compute_type,
-            split_on_punctuation_for_display=True, # Разбивает на строки при обнаружении знаков препинаний
-            buffer_trimming=config.whisper.buffer_trimming,  # Режим сегментации из конфига
-            buffer_trimming_sec=config.whisper.buffer_trimming_sec,  # Время нарезки буфера из конфига
+            split_on_punctuation_for_display=True,  # Разбивает на строки при обнаружении знаков препинаний
             beam_size=config.whisper.beam_size,
-            min_chunk_size_sec=3,
-            max_chunk_size_sec=6
+            buffer_trimming=config.buffer_trimming,  # Режим сегментации из конфига
+            buffer_trimming_sec=config.buffer_trimming_sec,  # Время нарезки буфера из конфига
+            min_chunk_size_sec=config.min_chunk_size_sec,
+            max_chunk_size_sec=config.max_chunk_size_sec,
         )

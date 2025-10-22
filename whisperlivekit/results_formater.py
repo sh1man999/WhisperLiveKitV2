@@ -109,12 +109,12 @@ def format_output(state, silence, current_time, args, sep):
         speaker = int(token.speaker)
         token.corrected_speaker = speaker
         if not diarization:
-            if speaker == -1: #Speaker -1 means no attributed by diarization. In the frontend, it should appear under 'Speaker 1'
+            if speaker == -1: #«Speaker -1» означает, что атрибут не указан в диаризации. В интерфейсе он должен отображаться в разделе «Speaker 1».
                 token.corrected_speaker = 1
                 token.validated_speaker = True
         else:
             # if token.end > end_attributed_speaker and token.speaker != -2:
-            #     if tokens[-1].speaker == -2:  #if it finishes by a silence, we want to append the undiarized text to the last speaker.
+            #     if tokens[-1].speaker == -2:  # Если выступление заканчивается молчанием, мы хотим добавить undiarized текст к последнему говорящему.
             #         token.corrected_speaker = previous_speaker
             #     else:
             #         undiarized_text.append(token.text)
@@ -126,27 +126,27 @@ def format_output(state, silence, current_time, args, sep):
             if last_punctuation == i-1:
                 if token.speaker != previous_speaker:
                     token.validated_speaker = True
-                    # perfect, diarization perfectly aligned
+                    # идеально, диаризация идеально выровнена
                     last_punctuation = None
                 else:
                     speaker_change_pos, new_speaker = next_speaker_change(i, tokens, speaker)
                     if speaker_change_pos:
-                        # Corrects delay:
+                        # Исправляет задержку:
                         # That was the idea. <Okay> haha |SPLIT SPEAKER| that's a good one
-                        # should become:
+                        # должен стать:
                         # That was the idea. |SPLIT SPEAKER| <Okay> haha that's a good one
                         token.corrected_speaker = new_speaker
                         token.validated_speaker = True
             elif speaker != previous_speaker:
                 if not (speaker == -2 or previous_speaker == -2):
                     if next_punctuation_change(i, tokens):
-                        # Corrects advance:
+                        # Исправляет продвижение:
                         # Are you |SPLIT SPEAKER| <okay>? yeah, sure. Absolutely
-                        # should become:
+                        # должен стать:
                         # Are you <okay>? |SPLIT SPEAKER| yeah, sure. Absolutely
                         token.corrected_speaker = previous_speaker
                         token.validated_speaker = True
-                    else: #Problematic, except if the language has no punctuation. We append to previous line, except if disable_punctuation_split is set to True.
+                    else: #Проблематично, за исключением случаев, когда в языке нет знаков препинания. Мы добавляем текст к предыдущей строке, за исключением случаев, когда параметр disable_punctuation_split установлен в значение True.
                         if not disable_punctuation_split:
                             token.corrected_speaker = previous_speaker
                             token.validated_speaker = False
@@ -179,7 +179,7 @@ def format_output(state, silence, current_time, args, sep):
 
 
     for i, line in enumerate(lines):
-        # Assign unique ID based on position
+        # Назначить уникальный идентификатор в зависимости от позиции
         line.id = i
 
         should_capitalize = False
@@ -190,13 +190,13 @@ def format_output(state, silence, current_time, args, sep):
             if prev_text and prev_text[-1] in (".", "?", "!"):
                 should_capitalize = True
         if should_capitalize:
-            # Capitalize the very first letter
+            # Сделать первую букву заглавной
             stripped_text = line.text.lstrip()
             if stripped_text:
                 capitalized_text = stripped_text[0].upper() + stripped_text[1:]
                 line.text = line.text[:len(line.text) - len(stripped_text)] + capitalized_text
 
-        # Then apply the user's logic for subsequent sentences
+        # Затем примените логику пользователя для последующих предложений.
         line.text = capitalize_after_delimiters(line.text)
 
     if state.buffer_transcription and lines:

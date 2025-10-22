@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
-async def send_audio(websocket, source, chunk_size_s=1.0, sample_rate=16000, simu_realtime=False):
+async def send_audio(websocket, source, chunk_size_s=1.0, sample_rate=16000):
     """Send audio chunks (file or mic) to websocket"""
     if source == "mic":
         logger.info("Streaming from microphone...")
@@ -47,9 +47,7 @@ async def send_audio(websocket, source, chunk_size_s=1.0, sample_rate=16000, sim
             if len(chunk) == 0:
                 continue
             await _send_chunk(websocket, chunk, sample_rate)
-            if simu_realtime:
-                await asyncio.sleep(chunk_size_s)
-
+        await asyncio.sleep(100)
         await websocket.send(b"")  # End of stream
         return duration
 
@@ -67,6 +65,7 @@ async def receive_updates(websocket, first_token_event):  # noqa: C901, ANN001
     RESET = "\033[0m"
 
     displayed_lines = {}  # Map line_id -> line_text
+    texts = {}
     last_line_id = None  # Track the last finalized line ID
     last_buffer = ""  # Track last buffer to avoid redundant updates
 
@@ -87,7 +86,9 @@ async def receive_updates(websocket, first_token_event):  # noqa: C901, ANN001
                 if line_id is None:
                     continue
 
-                line_display = f"ID:{line['id']} {line['start']} - {line['end']} Speaker {line['speaker']}: {line['text'].strip()}"
+                text = line['text'].strip()
+                line_display = f"ID:{line['id']} {line['start']} - {line['end']} Speaker {line['speaker']}: {text}"
+                texts[line_id] = text
 
                 if line_id not in displayed_lines:
                     # New line - always print with newline
@@ -124,6 +125,8 @@ async def receive_updates(websocket, first_token_event):  # noqa: C901, ANN001
 
             if resp.get("type") == "ready_to_stop":
                 print("\n")  # noqa: T201
+                for text in texts.values():
+                    print(text, end=" ")
                 break
 
         except websockets.exceptions.ConnectionClosedOK:

@@ -6,28 +6,6 @@ import contextlib
 
 logger = logging.getLogger(__name__)
 
-ERROR_INSTALL_INSTRUCTIONS = f"""
-{'='*50}
-FFmpeg is not installed or not found in your system's PATH.
-Alternative Solution: You can still use WhisperLiveKit without FFmpeg by adding the --pcm-input parameter. Note that when using this option, audio will not be compressed between the frontend and backend, which may result in higher bandwidth usage.
-
-If you want to install FFmpeg:
-
-# Ubuntu/Debian:
-sudo apt update && sudo apt install ffmpeg
-
-# macOS (using Homebrew):
-brew install ffmpeg
-
-# Windows:
-# 1. Download the latest static build from https://ffmpeg.org/download.html
-# 2. Extract the archive (e.g., to C:\\FFmpeg).
-# 3. Add the 'bin' directory (e.g., C:\\FFmpeg\\bin) to your system's PATH environment variable.
-
-After installation, please restart the application.
-{'='*50}
-"""
-
 class FFmpegState(Enum):
     STOPPED = "stopped"
     STARTING = "starting"
@@ -49,33 +27,25 @@ class FFmpegManager:
         self.state = FFmpegState.STOPPED
         self._state_lock = asyncio.Lock()
 
-    def _build_command(self):
-        if self.url:
-            input_source = self.url
-        else: # mic mode
-            input_source = "pipe:0"
-
-        return [
-            "ffmpeg",
-            "-hide_banner",
-            "-loglevel", "error",
-            "-i", input_source,
-            "-f", "s16le",
-            "-acodec", "pcm_s16le",
-            "-ac", str(self.channels),
-            "-ar", str(self.sample_rate),
-            "pipe:1"
-        ]
-
     async def start(self) -> bool:
         async with self._state_lock:
             if self.state != FFmpegState.STOPPED:
-                logger.warning(f"FFmpeg already running in state: {self.state}")
+                logger.warning(f"FFmpeg уже запущен в состоянии: {self.state}")
                 return False
             self.state = FFmpegState.STARTING
 
         try:
-            cmd = self._build_command()
+            cmd = [
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel", "error",
+                "-i", self.url,
+                "-f", "s16le",
+                "-acodec", "pcm_s16le",
+                "-ac", str(self.channels),
+                "-ar", str(self.sample_rate),
+                "pipe:1"
+            ]
 
             self.process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -93,7 +63,7 @@ class FFmpegManager:
             return True
 
         except FileNotFoundError:
-            logger.error(ERROR_INSTALL_INSTRUCTIONS)
+            logger.error("FFmpeg не установлен или не найден в системной переменной PATH.")
             async with self._state_lock:
                 self.state = FFmpegState.FAILED
             if self.on_error_callback:
@@ -101,7 +71,7 @@ class FFmpegManager:
             return False
 
         except Exception as e:
-            logger.error(f"Error starting FFmpeg: {e}")
+            logger.error(f"Ошибка запуска FFmpeg: {e}")
             async with self._state_lock:
                 self.state = FFmpegState.FAILED
             if self.on_error_callback:
@@ -131,7 +101,7 @@ class FFmpegManager:
     async def write_data(self, data: bytes) -> bool:
         async with self._state_lock:
             if self.state != FFmpegState.RUNNING:
-                logger.warning(f"Cannot write, FFmpeg state: {self.state}")
+                logger.warning(f"Невозможно записать, состояние FFmpeg: {self.state}")
                 return False
 
         try:
@@ -139,7 +109,7 @@ class FFmpegManager:
             await self.process.stdin.drain()
             return True
         except Exception as e:
-            logger.error(f"Error writing to FFmpeg: {e}")
+            logger.error(f"Ошибка записи в FFmpeg: {e}")
             if self.on_error_callback:
                 await self.on_error_callback("write_error")
             return False
@@ -147,7 +117,7 @@ class FFmpegManager:
     async def read_data(self, size: int) -> Optional[bytes]:
         async with self._state_lock:
             if self.state != FFmpegState.RUNNING:
-                logger.warning(f"Cannot read, FFmpeg state: {self.state}")
+                logger.warning(f"Невозможно прочитать состояние FFmpeg: {self.state}")
                 return None
 
         try:
@@ -158,10 +128,10 @@ class FFmpegManager:
 
             return data
         except asyncio.TimeoutError:
-            logger.warning("FFmpeg read timeout.")
+            logger.warning("Тайм-аут чтения FFmpeg.")
             return None
         except Exception as e:
-            logger.error(f"Error reading from FFmpeg: {e}")
+            logger.error(f"Ошибка чтения из FFmpeg: {e}")
             if self.on_error_callback:
                 await self.on_error_callback("read_error")
             return None
@@ -173,18 +143,18 @@ class FFmpegManager:
     async def restart(self) -> bool:
         async with self._state_lock:
             if self.state == FFmpegState.RESTARTING:
-                logger.warning("Restart already in progress.")
+                logger.warning("Перезапуск FFmpeg в процессе.")
                 return False
             self.state = FFmpegState.RESTARTING
 
-        logger.info("Restarting FFmpeg...")
+        logger.info("Перезапуск FFmpeg...")
 
         try:
             await self.stop()
             await asyncio.sleep(1)  # short delay before restarting
             return await self.start()
         except Exception as e:
-            logger.error(f"Error during FFmpeg restart: {e}")
+            logger.error(f"Ошибка при перезапуске FFmpeg: {e}")
             async with self._state_lock:
                 self.state = FFmpegState.FAILED
             if self.on_error_callback:
@@ -201,6 +171,6 @@ class FFmpegManager:
                     break
                 logger.debug(f"FFmpeg stderr: {line.decode(errors='ignore').strip()}")
         except asyncio.CancelledError:
-            logger.info("FFmpeg stderr drain task cancelled.")
+            logger.info("задача FFmpeg stderr drain отменена.")
         except Exception as e:
-            logger.error(f"Error draining FFmpeg stderr: {e}")
+            logger.error(f"Ошибка draining FFmpeg stderr: {e}")

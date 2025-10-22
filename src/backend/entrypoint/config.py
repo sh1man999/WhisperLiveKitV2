@@ -119,8 +119,6 @@ class WhisperConfig(BaseNeuralConfig):
     cpu_threads: int
     num_workers: int
     device: str
-    buffer_trimming: str
-    buffer_trimming_sec: int
     beam_size: int
 
     @classmethod
@@ -133,8 +131,6 @@ class WhisperConfig(BaseNeuralConfig):
         cpu_threads = getenv("WHISPER__CPU_THREADS", "1")
         num_workers = getenv("WHISPER__NUM_WORKERS", "1")
         device = getenv("WHISPER__DEVICE", "cuda")
-        buffer_trimming = getenv("WHISPER__BUFFER_TRIMMING", "segment")
-        buffer_trimming_sec = getenv("WHISPER__BUFFER_TRIMMING_SEC", "15")
         beam_size = getenv("WHISPER__BEAM_SIZE", "5")
 
         cls.validate_device(key="WHISPER__DEVICE", device=device, allowed_devices={"cpu", "cuda", "auto"})
@@ -153,8 +149,6 @@ class WhisperConfig(BaseNeuralConfig):
             cpu_threads=int(cpu_threads),
             num_workers=int(num_workers),
             device=device,
-            buffer_trimming=buffer_trimming,
-            buffer_trimming_sec=int(buffer_trimming_sec),
             beam_size=int(beam_size),
         )
 
@@ -170,6 +164,11 @@ class Config:
     hostname: str
     auth_token: str
     diarization: bool
+
+    buffer_trimming: str
+    buffer_trimming_sec: int
+    min_chunk_size_sec: float
+    max_chunk_size_sec: float
 
     @staticmethod
     def from_env() -> "Config":
@@ -192,6 +191,11 @@ class Config:
         pyannote = PyannoteConfig.from_env()
         os.environ.setdefault("CUDA_DEVICE_INDEX", cuda_device_index)
         os.environ.setdefault("HF_TOKEN", pyannote.huggingface_token)
+
+        buffer_trimming = getenv("BUFFER_TRIMMING", "segment")
+        buffer_trimming_sec = getenv("BUFFER_TRIMMING_SEC", "15")
+        min_chunk_size_sec = getenv("MIN_CHUNK_SIZE_SEC", "1")
+        max_chunk_size_sec = getenv("MAX_CHUNK_SIZE_SEC", "5")
         return Config(
             log_level=log_level,
             debug=debug,
@@ -202,6 +206,10 @@ class Config:
             hostname=f"{os.uname().nodename}_cuda_{cuda_device_index}",
             auth_token=os.getenv("AUTH_TOKEN"),
             diarization=os.getenv("DIARIZATION", "False") == "True",
+            buffer_trimming=buffer_trimming,
+            buffer_trimming_sec=int(buffer_trimming_sec),
+            min_chunk_size_sec=float(min_chunk_size_sec),
+            max_chunk_size_sec=float(max_chunk_size_sec),
         )
 
 

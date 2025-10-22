@@ -26,7 +26,6 @@ let lastReceivedData = null;
 let lastSignature = null;
 let availableMicrophones = [];
 let selectedMicrophoneId = null;
-let serverUseAudioWorklet = null;
 let configReadyResolve;
 const configReady = new Promise((r) => (configReadyResolve = r));
 let outputAudioContext = null;
@@ -393,10 +392,7 @@ function setupWebSocket() {
         websocket.onmessage = (event) => {
             const data = JSON.parse(event.data);
             if (data.type === "config") {
-                serverUseAudioWorklet = !!data.useAudioWorklet;
-                statusText.textContent = serverUseAudioWorklet
-                    ? "Подключено. Используется AudioWorklet (PCM)."
-                    : "Подключено. Используется MediaRecorder (WebM).";
+                statusText.textContent = "Подключено. Используется AudioWorklet (PCM).";
                 if (configReadyResolve) configReadyResolve();
                 return;
             }
@@ -678,58 +674,43 @@ async function startRecording() {
         microphone = audioContext.createMediaStreamSource(stream);
         microphone.connect(analyser);
 
-        if (serverUseAudioWorklet) {
-            if (!audioContext.audioWorklet) {
-                throw new Error("AudioWorklet не поддерживается в этом браузере");
-            }
-            await audioContext.audioWorklet.addModule("/web/pcm_worklet.js");
-            workletNode = new AudioWorkletNode(audioContext, "pcm-forwarder", {
-                numberOfInputs: 1,
-                numberOfOutputs: 0,
-                channelCount: 1
-            });
-            microphone.connect(workletNode);
-
-            recorderWorker = new Worker("/web/recorder_worker.js");
-            recorderWorker.postMessage({
-                command: "init",
-                config: {
-                    sampleRate: audioContext.sampleRate,
-                },
-            });
-
-            recorderWorker.onmessage = (e) => {
-                if (websocket && websocket.readyState === WebSocket.OPEN) {
-                    websocket.send(e.data.buffer);
-                }
-            };
-
-            workletNode.port.onmessage = (e) => {
-                const data = e.data;
-                const ab = data instanceof ArrayBuffer ? data : data.buffer;
-                recorderWorker.postMessage(
-                    {
-                        command: "record",
-                        buffer: ab,
-                    },
-                    [ab]
-                );
-            };
-        } else {
-            try {
-                recorder = new MediaRecorder(stream, {mimeType: "audio/webm"});
-            } catch (e) {
-                recorder = new MediaRecorder(stream);
-            }
-            recorder.ondataavailable = (e) => {
-                if (websocket && websocket.readyState === WebSocket.OPEN) {
-                    if (e.data && e.data.size > 0) {
-                        websocket.send(e.data);
-                    }
-                }
-            };
-            recorder.start(chunkDuration);
+        if (!audioContext.audioWorklet) {
+            throw new Error("AudioWorklet не поддерживается в этом браузере");
         }
+        await audioContext.audioWorklet.addModule("/web/pcm_worklet.js");
+        workletNode = new AudioWorkletNode(audioContext, "pcm-forwarder", {
+            numberOfInputs: 1,
+            numberOfOutputs: 0,
+            channelCount: 1
+        });
+        microphone.connect(workletNode);
+
+        recorderWorker = new Worker("/web/recorder_worker.js");
+        recorderWorker.postMessage({
+            command: "init",
+            config: {
+                sampleRate: audioContext.sampleRate,
+            },
+        });
+
+        recorderWorker.onmessage = (e) => {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send(e.data.buffer);
+            }
+        };
+
+        workletNode.port.onmessage = (e) => {
+            const data = e.data;
+            const ab = data instanceof ArrayBuffer ? data : data.buffer;
+            recorderWorker.postMessage(
+                {
+                    command: "record",
+                    buffer: ab,
+                },
+                [ab]
+            );
+        };
+
 
         startTime = Date.now();
         timerInterval = setInterval(updateTimer, 1000);

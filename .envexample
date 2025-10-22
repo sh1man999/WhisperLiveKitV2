@@ -11,6 +11,8 @@ WHISPER__MODELS_PATH=./models
 #WHISPER__CPU_THREADS=1
 #WHISPER__NUM_WORKERS=1
 #WHISPER__DEVICE=cuda
+# beam_size: количество beam search (5-10, больше = лучше качество, но медленнее)
+#WHISPER__BEAM_SIZE=5
 
 # https://github.com/juanmc2005/diart
 #PYANNOTE__HUGGINGFACE_TOKEN=hf_Eae
@@ -18,12 +20,17 @@ WHISPER__MODELS_PATH=./models
 #PYANNOTE__EMBEDDING_MODEL=pyannote/embedding
 #PYANNOTE__DEVICE=cuda
 #PYANNOTE__CUDA_DEVICE_INDEX=0
-# Настройки буферизации (важно для моделей turbo)
-# buffer_trimming: "segment" или "sentence" (по умолчанию "segment")
-# buffer_trimming_sec: время в секундах (по умолчанию 5)
-# Уменьшите buffer_trimming_sec если модель не ставит знаки препинания при быстрой речи
-#WHISPER__BUFFER_TRIMMING=segment
-#WHISPER__BUFFER_TRIMMING_SEC=15
 
-# beam_size: количество beam search (5-10, больше = лучше качество, но медленнее)
-#WHISPER__BEAM_SIZE=5
+
+# Настройки буферизации для предотвращения длинных сегментов без знаков препинания
+# buffer_trimming: "segment" или "sentence"
+# buffer_trimming_sec: время в секундах (рекомендуется 10-15)
+BUFFER_TRIMMING=segment
+BUFFER_TRIMMING_SEC=15
+
+# Это минимальный размер чанка в секундах, который запускает обработку. Т.е. пока не накопит он будет запускать транскрипцию
+MIN_CHUNK_SIZE_SEC=1
+# Это максимальный размер чанка в секундах, который система обработает за один раз.
+# Это "потолок", который предотвращает переполнение и слишком большие задержки.
+MAX_CHUNK_SIZE_SEC=5
+
