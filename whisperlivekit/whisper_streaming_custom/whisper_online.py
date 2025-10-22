@@ -86,7 +86,6 @@ def backend_factory(
     )
     e = time.time()
     logger.info(f"done. It took {round(e - t, 2)} seconds.")
-    #asr.use_vad()
 
     # Create the tokenizer
     if buffer_trimming == "sentence":

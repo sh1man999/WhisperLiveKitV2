@@ -21,6 +21,9 @@ dependencies = [
     "tqdm",
     "librosa",
     "soundfile",
+    "faster-whisper==1.2.0",
+    #"faster-whisper==0.10.0",
+    #"nvidia-cudnn-cu11==8.9.4.25",
 ]
 
 [dependency-groups]

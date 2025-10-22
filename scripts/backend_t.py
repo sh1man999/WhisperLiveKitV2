@@ -15,7 +15,6 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 import librosa
-import numpy as np
 
 from whisperlivekit.whisper_streaming_custom.whisper_online import backend_factory
 from whisperlivekit.whisper_streaming_custom.online_asr import OnlineASRProcessor

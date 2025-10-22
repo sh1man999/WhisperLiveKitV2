@@ -4,6 +4,7 @@ import logging
 from typing import List, Union
 import numpy as np
 from faster_whisper.transcribe import Segment
+from faster_whisper.vad import VadOptions
 
 from whisperlivekit.timed_objects import ASRToken
 from whisperlivekit.whisper_streaming_custom.constants.bad_words import BAD_WORDS
@@ -95,12 +96,14 @@ class FasterWhisperASR:
         combined_prompt = punctuation_prompt + init_prompt if init_prompt else punctuation_prompt
 
         segments, info = self.model.transcribe(
-            audio,
+            audio=audio,
             language=lang_to_use,
             initial_prompt=combined_prompt,
             beam_size=self.beam_size,
             word_timestamps=True,
             condition_on_previous_text=True,
+            vad_filter=True,
+            vad_parameters=VadOptions(threshold=0.2, min_silence_duration_ms=1000),
             **self.transcribe_kargs,
         )
         return self._filter_bad_segments(list(segments))
@@ -119,8 +122,6 @@ class FasterWhisperASR:
     def segments_end_ts(self, segments) -> List[float]:
         return [segment.end for segment in segments]
 
-    def use_vad(self):
-        self.transcribe_kargs["vad_filter"] = True
 
     def __repr__(self):
         return (

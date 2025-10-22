@@ -213,7 +213,7 @@ class OnlineASRProcessor:
             if time_since_last_output > self.buffer_trimming_sec:
                 logger.warning(
                     f"Нет данных от ASR {time_since_last_output:.2f}s. "
-                    f"Сброс буфера для предотвращения зависания."
+                    f"Сброс буфера для предотвращения зависания из за долгой обработки"
                 )
                 self.init(offset=self.get_audio_buffer_end_time())
                 return [], current_audio_processed_upto
