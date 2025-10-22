@@ -87,18 +87,10 @@ class FasterWhisperASR:
     def transcribe(self, audio: np.ndarray, init_prompt: str = "", language: str = None) -> list:
         lang_to_use = language if language and language != "auto" else self.original_language
 
-        # Добавляем явный промпт с пунктуацией
-        punctuation_prompt = ""
-        if lang_to_use == "ru":
-            punctuation_prompt = "Добрый день! Как дела? Всё хорошо. "
-
-        # Комбинируем промпт с пунктуацией и контекстный промпт
-        combined_prompt = punctuation_prompt + init_prompt if init_prompt else punctuation_prompt
-
         segments, info = self.model.transcribe(
             audio=audio,
             language=lang_to_use,
-            initial_prompt=combined_prompt,
+            initial_prompt=init_prompt,
             beam_size=self.beam_size,
             word_timestamps=True,
             condition_on_previous_text=True,

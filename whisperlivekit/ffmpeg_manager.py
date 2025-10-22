@@ -35,16 +35,36 @@ class FFmpegManager:
             self.state = FFmpegState.STARTING
 
         try:
+            # cmd = [
+            #     "ffmpeg",
+            #     "-hide_banner",
+            #     "-loglevel", "error",
+            #     "-i", self.url,
+            #     "-f", "s16le",
+            #     "-acodec", "pcm_s16le",
+            #     "-ac", str(self.channels),
+            #     "-ar", str(self.sample_rate),
+            #     "pipe:1"
+            # ]
             cmd = [
                 "ffmpeg",
                 "-hide_banner",
                 "-loglevel", "error",
-                "-i", self.url,
+                "-nostdin",  # не читаем stdin при URL-источнике
+                "-fflags", "+nobuffer",  # минимизировать буферизацию на входе
+                "-flags", "low_delay",  # низкая задержка
+                "-reconnect", "1",  # авто-реконнект
+                "-reconnect_streamed", "1",
+                "-reconnect_delay_max", "2",
+                "-i", self.url,  # источник
+                "-map", "a:0",  # явный выбор первой аудиодорожки
+                "-vn",  # отключить видео в выходе
+                "-sn",  # отключить субтитры в выходе
                 "-f", "s16le",
                 "-acodec", "pcm_s16le",
                 "-ac", str(self.channels),
                 "-ar", str(self.sample_rate),
-                "pipe:1"
+                "pipe:1",
             ]
 
             self.process = await asyncio.create_subprocess_exec(

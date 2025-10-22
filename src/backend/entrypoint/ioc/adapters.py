@@ -45,4 +45,5 @@ class TranscriptionProvider(Provider):
             buffer_trimming_sec=config.buffer_trimming_sec,  # Время нарезки буфера из конфига
             min_chunk_size_sec=config.min_chunk_size_sec,
             max_chunk_size_sec=config.max_chunk_size_sec,
+            confidence_validation=False, # Если он включен (True), метод flush будет "подтверждать" (commit) токены, даже если они не совпадают с предыдущим буфером, при условии, что их вероятность (token.probability) очень высока ( > 0.95).
         )

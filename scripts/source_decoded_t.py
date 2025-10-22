@@ -23,7 +23,7 @@ import numpy as np
 
 import websockets
 
-logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -127,10 +127,10 @@ async def send_audio_stream(websocket, stream_reader, chunk_size_s=1.0, sample_r
             if chunk_count % 10 == 0:
                 duration = total_bytes / (sample_rate * bytes_per_sample)
                 elapsed = time.time() - start_time
-                logger.info(
-                    f"Sent {chunk_count} chunks, {duration:.1f}s of audio "
-                    f"in {elapsed:.1f}s elapsed"
-                )
+                # logger.info(
+                #     f"Sent {chunk_count} chunks, {duration:.1f}s of audio "
+                #     f"in {elapsed:.1f}s elapsed"
+                # )
 
             # Small delay to avoid overwhelming the server
             await asyncio.sleep(0.01)
@@ -167,20 +167,16 @@ async def receive_updates(websocket, first_token_event, start_time):
     GRAY = "\033[90m"
     GREEN = "\033[92m"
     YELLOW = "\033[93m"
-    CYAN = "\033[96m"
     RESET = "\033[0m"
 
     displayed_lines = {}  # Map line_id -> (text, start, end, speaker) to detect content changes
-    finalized_lines = set()  # Track which lines are finalized (no longer updating)
     last_line_id = None  # Track the last finalized line ID
     last_buffer = ""  # Track last buffer to avoid redundant updates
-    last_seen_lines = set()  # Lines seen in the last update
 
     while True:
         try:
             msg = await websocket.recv()
             resp = json.loads(msg)
-            current_time = time.time()
 
             # Check for errors
             if resp.get("status") == "error":
@@ -189,16 +185,14 @@ async def receive_updates(websocket, first_token_event, start_time):
                 logger.error(f"Server error: {error_msg}")
                 break
 
-            # Get processing metrics
-            remaining_transcription = resp.get("remaining_time_transcription", 0)
-            remaining_diarization = resp.get("remaining_time_diarization", 0)
-
             # Process finalized lines
             lines = resp.get("lines", [])
+
+            # Show ALL lines from server (no filtering)
             valid_lines = [
-                line for line in lines
-                if line.get("text", "").strip()  # Has non-empty text
-                and line.get("speaker", -1) >= 0  # Valid speaker ID
+                line
+                for line in lines
+                if line.get("speaker", -1) >= 0  # Valid speaker ID
                 and line.get("speaker", -1) != -2  # Not a dummy line
                 and line.get("id") is not None  # Has valid ID
             ]
@@ -215,7 +209,6 @@ async def receive_updates(websocket, first_token_event, start_time):
                 # Parse time (handles both float and '0:01:23' format)
                 start = parse_time_to_seconds(line['start'])
                 end = parse_time_to_seconds(line['end'])
-                duration = end - start
                 text = line['text'].strip()
                 speaker = line['speaker']
 
@@ -223,15 +216,15 @@ async def receive_updates(websocket, first_token_event, start_time):
                 content_key = (text, start, end, speaker)
 
                 # Check if this line is now finalized (no longer in last update or content stopped changing)
-                is_new = line_id not in displayed_lines
                 content_changed = displayed_lines.get(line_id) != content_key
 
                 if line_id not in displayed_lines:
                     # New line - print without metrics
+                    text_line = text if speaker != -2 else "Тишина"
                     line_display = (
                         f"{GREEN}ID:{line_id}{RESET} "
                         f"{start:.2f}s - {end:.2f}s "
-                        f"Speaker {speaker}: {text}"
+                        f"Speaker {speaker}: {text_line}"
                     )
                     print(f"\n{line_display}", end="", flush=True)
                     displayed_lines[line_id] = content_key
@@ -241,10 +234,11 @@ async def receive_updates(websocket, first_token_event, start_time):
 
                 elif content_changed:
                     # Line content changed - update without metrics
+                    text_line = text if speaker != -2 else "Тишина"
                     line_display = (
                         f"{GREEN}ID:{line_id}{RESET} "
                         f"{start:.2f}s - {end:.2f}s "
-                        f"Speaker {speaker}: {text}"
+                        f"Speaker {speaker}: {text_line}"
                     )
                     if line_id == last_line_id:
                         print(f"\r{line_display}", end="", flush=True)
@@ -253,33 +247,25 @@ async def receive_updates(websocket, first_token_event, start_time):
                         last_line_id = line_id
                     displayed_lines[line_id] = content_key
 
-            last_seen_lines = current_seen_lines
 
             # Display buffer on the same line as the last finalized line, in gray
             buffer_trans = resp.get("buffer_transcription", "")
-
-            # Show processing lag metrics for buffer
-            lag_info = ""
-            if remaining_transcription > 0 or remaining_diarization > 0:
-                lag_info = f" {CYAN}[Transcription Lag:{remaining_transcription:.1f}s"
-                if remaining_diarization > 0:
-                    lag_info += f" D:{remaining_diarization:.1f}s"
-                lag_info += f"]{RESET}"
 
             if last_line_id is not None:
                 # Get the last line text
                 content_key = displayed_lines.get(last_line_id)
                 if content_key:
                     text, start, end, speaker = content_key
+                    text_line = text if speaker != -2 else "Тишина"
                     last_line_text = (
                         f"{GREEN}ID:{last_line_id}{RESET} "
                         f"{start:.2f}s - {end:.2f}s "
-                        f"Speaker {speaker}: {text}"
+                        f"Speaker {speaker}: {text_line}"
                     )
 
-                    # Update display with buffer appended in gray
+                    # Update display with buffer appended in gray (without metrics)
                     if buffer_trans:
-                        combined = f"\r{last_line_text} {GRAY}{buffer_trans}{RESET}{lag_info}"
+                        combined = f"\r{last_line_text} {GRAY}{buffer_trans}{RESET}"
                         print(combined, end="", flush=True)
                         last_buffer = buffer_trans
                     elif last_buffer:
@@ -289,23 +275,7 @@ async def receive_updates(websocket, first_token_event, start_time):
 
             if resp.get("type") == "ready_to_stop":
                 print("\n")
-                # Print final metrics for all lines
-                print(f"\n{CYAN}{'='*70}")
-                print("FINAL METRICS FOR ALL LINES")
-                print(f"{'='*70}{RESET}\n")
-
-                for line_id in sorted(displayed_lines.keys()):
-                    content_key = displayed_lines[line_id]
-                    text, start, end, speaker = content_key
-                    duration = end - start
-
-                    latency = current_time - start_time - end
-                    rtf = abs(latency) / duration if duration > 0 else 0
-
-                    metrics_str = f"{CYAN}[Lat:{latency:.2f}s RTF:{rtf:.2f} Dur:{duration:.1f}s]{RESET}"
-                    print(f"{GREEN}ID:{line_id}{RESET} {start:.2f}s - {end:.2f}s Speaker {speaker}: {text} {metrics_str}")
-
-                print(f"\n{CYAN}{'='*70}{RESET}\n")
+                logger.info("Stream processing complete")
                 break
 
         except websockets.exceptions.ConnectionClosedOK:
@@ -356,9 +326,7 @@ async def test_url_stream(source, host="localhost", port=8000, chunk_size=1.0, l
             # Wait for first token
             try:
                 await asyncio.wait_for(first_token_event.wait(), timeout=30)
-                first_latency = time.time() - start_time
             except asyncio.TimeoutError:
-                first_latency = None
                 logger.warning("No transcription received within 30 seconds")
 
             # Wait for sending to complete
@@ -366,18 +334,7 @@ async def test_url_stream(source, host="localhost", port=8000, chunk_size=1.0, l
 
             # Wait for all results
             await recv_task
-            total_time = time.time() - start_time
 
-            # Print metrics
-            print("\n" + "=" * 70)
-            print("METRICS")
-            print("=" * 70)
-            if first_latency:
-                print(f"First Token Latency: {first_latency:.3f}s")
-            else:
-                print("First Token Latency: N/A (no tokens received)")
-            print(f"Total Time: {total_time:.3f}s")
-            print("=" * 70 + "\n")
 
     except Exception as e:
         logger.error(f"Error during test: {e}", exc_info=True)

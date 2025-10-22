@@ -38,7 +38,7 @@ async def receive_updates(websocket, first_token_event):  # noqa: C901, ANN001
                 if line_id is None:
                     continue
 
-                line_display = f"{line['start']} - {line['end']} Speaker {line['speaker']}: {line['text'].strip()}"
+                line_display = f"[{line_id}] [{line['start']} - {line['end']}] [Speaker {line['speaker']}]: {line['text'].strip()}"
 
                 if line_id not in displayed_lines:
                     # New line - always print with newline

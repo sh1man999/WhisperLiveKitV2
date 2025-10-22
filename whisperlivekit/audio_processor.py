@@ -179,7 +179,12 @@ class AudioProcessor:
 
                 current_time = time()
                 elapsed_time = max(0.0, current_time - beg)
-                buffer_size = max(int((self.sample_rate * self.bytes_per_sample) * elapsed_time), 4096)  # dynamic read
+
+                bytes_per_second = (
+                    self.sample_rate * self.channels * self.bytes_per_sample
+                )
+
+                buffer_size = max(int(bytes_per_second * elapsed_time), 4096)  # dynamic read
                 beg = current_time
 
                 chunk = await self.ffmpeg_manager.read_data(buffer_size)
@@ -190,10 +195,11 @@ class AudioProcessor:
                     continue
 
                 self.pcm_buffer.extend(chunk)
-
                 # Только тогда, когда буфер достигает порога обработки
                 if len(self.pcm_buffer) >= self.min_chunk_size_bytes:
-                    logger.info(f"Буфер готов к обработке: {len(self.pcm_buffer)} bytes ({len(self.pcm_buffer) / self.min_chunk_size_bytes:.2f}s)")
+                    logger.debug(
+                        f"Буфер готов к обработке: {len(self.pcm_buffer)} bytes ({len(self.pcm_buffer) / bytes_per_second:.2f}s)"
+                    )
 
                 await self.handle_pcm_data()
 

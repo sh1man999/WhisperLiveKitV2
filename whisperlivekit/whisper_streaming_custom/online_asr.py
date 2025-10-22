@@ -211,9 +211,12 @@ class OnlineASRProcessor:
         if not committed_tokens and buffer_duration > self.buffer_trimming_sec:
             time_since_last_output = self.get_audio_buffer_end_time() - self.time_of_last_asr_output
             if time_since_last_output > self.buffer_trimming_sec:
+                """Сообщение появляется, когда ASR долго не выдаёт подтверждённые токены: если время с момента последнего “закомиченного” вывода
+                превышает порог buffer_trimming_sec, процессор логирует предупреждение и сбрасывает буфер,
+                чтобы не зависнуть на чрезмерно длинной обработке."""
                 logger.warning(
-                    f"Нет данных от ASR {time_since_last_output:.2f}s. "
-                    f"Сброс буфера для предотвращения зависания из за долгой обработки"
+                    f"ASR не выдал подтвержденных токенов за {time_since_last_output:.2f}s. "
+                    f"Сброс буфера для предотвращения зависания из-за слишком долгой обработки."
                 )
                 self.init(offset=self.get_audio_buffer_end_time())
                 return [], current_audio_processed_upto
