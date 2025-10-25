@@ -3,8 +3,9 @@ from whisperlivekit import TranscriptionEngine
 from src.backend.application.interfaces.audio_storage import AudioStorage
 from dishka import Provider, Scope, provide, from_context
 
-from src.backend.entrypoint.config import Config
+from src.backend.entrypoint.config import Config, VacConfig
 from src.backend.infrastructure.adapters.local_audio_storage import LocalAudioStorage
+from whisperlivekit.silero_vad_iterator import VADOnnxWrapper, RealtimeVADIterator
 
 
 # app dependency logic
@@ -15,6 +16,9 @@ class ConfigProvider(Provider):
 
     config = from_context(provides=Config, scope=Scope.APP)
 
+    @provide
+    def vac_config(self, config: Config) -> VacConfig:
+        return config.vac
 
 class StorageProvider(Provider):
     scope = Scope.APP
@@ -23,6 +27,21 @@ class StorageProvider(Provider):
 
 class TranscriptionProvider(Provider):
     scope = Scope.APP
+
+    @provide
+    def vac(self, config: VacConfig) -> VADOnnxWrapper:
+        from whisperlivekit.silero_vad_iterator import load_silero_vad
+
+        return load_silero_vad(
+            model_path=config.model_path, force_onnx_cpu=config.force_onnx_cpu
+        )
+
+    @provide(scope=Scope.SESSION)
+    def vac_realtime(self, config: VacConfig, vac_engine: VADOnnxWrapper) -> RealtimeVADIterator:
+        return RealtimeVADIterator(model=vac_engine,
+                                   min_silence_duration_ms=config.min_silence_duration_ms,
+                                   threshold=config.threshold) # threshold 0.2 or 0.5?
+
 
     @provide
     def transcription_engine(self, config: Config) -> TranscriptionEngine:
@@ -45,6 +64,6 @@ class TranscriptionProvider(Provider):
             buffer_trimming_sec=config.buffer_trimming_sec,  # Время нарезки буфера из конфига
             min_chunk_size_sec=config.min_chunk_size_sec,
             max_chunk_size_sec=config.max_chunk_size_sec,
-            vac=True, # TODO: Написать конфиг для вак
+            vac_config=config.vac,
             confidence_validation=False, # Если он включен (True), метод flush будет "подтверждать" (commit) токены, даже если они не совпадают с предыдущим буфером, при условии, что их вероятность (token.probability) очень высока ( > 0.95).
         )

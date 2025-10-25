@@ -152,6 +152,37 @@ class WhisperConfig(BaseNeuralConfig):
             beam_size=int(beam_size),
         )
 
+@dataclass
+class VacConfig:
+    model_path: str
+    enable: bool
+    min_silence_duration_ms: int
+    threshold: float
+    speech_pad_ms: int
+    chunk_size: float
+    force_onnx_cpu: bool
+
+    @classmethod
+    def from_env(cls) -> "VacConfig":
+        models_path = getenv("VAC__MODEL_PATH", "./models/silero_vad_16k_op15.onnx")
+        enable = getenv("VAC__ENABLE", "True") == "True"
+        min_silence_duration_ms = getenv("VAC__MIN_SILENCE_DURATION_MS", "1000")
+        threshold = getenv("VAC__THRESHOLD", "0.2")
+        speech_pad_ms = getenv("VAC__SPEECH_PAD_MS", "30")
+        chunk_size = getenv("VAC__CHUNK_SIZE", "0.04")
+        force_onnx_cpu = getenv("VAC__FORCE_ONNX_CPU", "True") == "True" # На CPU быстрее работает
+
+        return VacConfig(
+            model_path=models_path,
+            enable=enable,
+            min_silence_duration_ms=int(min_silence_duration_ms),
+            threshold=float(threshold),
+            speech_pad_ms=int(speech_pad_ms),
+            chunk_size=float(chunk_size),
+            force_onnx_cpu=force_onnx_cpu
+        )
+
+
 
 @dataclass
 class Config:
@@ -160,6 +191,7 @@ class Config:
     audio_storage_path: str
     whisper: WhisperConfig
     pyannote: PyannoteConfig
+    vac: VacConfig
     log_files_path: str | None
     hostname: str
     auth_token: str
@@ -189,6 +221,7 @@ class Config:
             raise ValueError(f"⚠️  Неверный LOG_LEVEL: '{log_level}'. Доступные: {', '.join(valid_levels)}")
         whisper = WhisperConfig.from_env()
         pyannote = PyannoteConfig.from_env()
+        vac = VacConfig.from_env()
         os.environ.setdefault("CUDA_DEVICE_INDEX", cuda_device_index)
         os.environ.setdefault("HF_TOKEN", pyannote.huggingface_token)
 
@@ -210,6 +243,7 @@ class Config:
             buffer_trimming_sec=int(buffer_trimming_sec),
             min_chunk_size_sec=float(min_chunk_size_sec),
             max_chunk_size_sec=float(max_chunk_size_sec),
+            vac=vac
         )
 
 

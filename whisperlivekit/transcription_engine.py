@@ -1,5 +1,7 @@
 from typing import Union
 
+from src.backend.entrypoint.config import VacConfig
+
 try:
     from whisperlivekit.whisper_streaming_custom.whisper_online import backend_factory
     from whisperlivekit.whisper_streaming_custom.online_asr import OnlineASRProcessor
@@ -9,42 +11,42 @@ from argparse import Namespace
 
 class TranscriptionEngine:
     
-    def __init__(self,
-                 is_diarization: bool=False,
-                 punctuation_split: bool=False,
-                 split_on_punctuation_for_display: bool=False,
-                 vac: bool=True,
-                 vac_chunk_size: float=0.04,
-                 log_level: str= "DEBUG",
-                 pcm_input:bool=False,
-                 disable_punctuation_split:bool=False,
-                 diarization_backend: str="diart",
-                 warmup_file: str=None,
-                 min_chunk_size_sec: float=0.5,
-                 max_chunk_size_sec: float=5,
-                 model_size: str="tiny",
-                 model_cache_dir: str=None,
-                 model_dir: str=None,
-                 device="auto",
-                 device_index: Union[int, list[int]] = 0,
-                 cpu_threads: int = 0,
-                 num_workers: int = 1,
-                 lan: str="auto",
-                 buffer_trimming: str= "segment",
-                 confidence_validation: bool= False, # Если он включен (True), метод flush будет "подтверждать" (commit) токены, даже если они не совпадают с предыдущим буфером, при условии, что их вероятность (token.probability) очень высока ( > 0.95).
-                 buffer_trimming_sec: int= 15,
-                 segmentation_model_name: str= "pyannote/segmentation-3.0",
-                 embedding_model_name: str = "pyannote/embedding",
-                 compute_type: str = "float16",
-                 beam_size: int = 5,  # Увеличение до 7-10 может улучшить пунктуацию
-                 ):
+    def __init__(
+        self,
+        vac_config: VacConfig,
+        is_diarization: bool = False,
+        punctuation_split: bool = False,
+        split_on_punctuation_for_display: bool = False,
+        log_level: str = "DEBUG",
+        pcm_input: bool = False,
+        disable_punctuation_split: bool = False,
+        diarization_backend: str = "diart",
+        warmup_file: str = None,
+        min_chunk_size_sec: float = 0.5,
+        max_chunk_size_sec: float = 5,
+        model_size: str = "tiny",
+        model_cache_dir: str = None,
+        model_dir: str = None,
+        device="auto",
+        device_index: Union[int, list[int]] = 0,
+        cpu_threads: int = 0,
+        num_workers: int = 1,
+        lan: str = "auto",
+        buffer_trimming: str = "segment",
+        confidence_validation: bool = False,  # Если он включен (True), метод flush будет "подтверждать" (commit) токены, даже если они не совпадают с предыдущим буфером, при условии, что их вероятность (token.probability) очень высока ( > 0.95).
+        buffer_trimming_sec: int = 15,
+        segmentation_model_name: str = "pyannote/segmentation-3.0",
+        embedding_model_name: str = "pyannote/embedding",
+        compute_type: str = "float16",
+        beam_size: int = 5,  # Увеличение до 7-10 может улучшить пунктуацию
+    ):
 
         self.args = Namespace(
             diarization=is_diarization,
             punctuation_split=punctuation_split,
             split_on_punctuation_for_display=split_on_punctuation_for_display,
-            vac=vac,
-            vac_chunk_size=vac_chunk_size,
+            vac=vac_config.enable,
+            vac_chunk_size=vac_config.chunk_size,
             log_level=log_level,
             pcm_input=pcm_input,
             disable_punctuation_split=disable_punctuation_split,
@@ -68,12 +70,6 @@ class TranscriptionEngine:
         self.asr = None
         self.tokenizer = None
         self.diarization = None
-        self.vac_model = None
-        
-        if vac:
-            import torch
-            self.vac_model, _ = torch.hub.load(repo_or_dir="snakers4/silero-vad", model="silero_vad")            
-
 
         self.asr = backend_factory(
             lan=lan,

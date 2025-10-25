@@ -137,7 +137,7 @@ dependencies = [
     { name = "gunicorn" },
     { name = "librosa" },
     { name = "logging" },
-    { name = "onnxruntime-gpu" },
+    { name = "onnxruntime" },
     { name = "python-multipart" },
     { name = "soundfile" },
     { name = "torch", version = "2.5.1", source = { registry = "https://download.pytorch.org/whl/cu124/" }, marker = "python_full_version < '3.13' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'" },
@@ -168,7 +168,7 @@ requires-dist = [
     { name = "gunicorn" },
     { name = "librosa" },
     { name = "logging" },
-    { name = "onnxruntime-gpu", specifier = ">=1.22.0" },
+    { name = "onnxruntime", specifier = ">=1.22.0" },
     { name = "python-multipart" },
     { name = "soundfile" },
     { name = "torch", specifier = "==2.5.1", index = "https://download.pytorch.org/whl/cu124/" },
@@ -1587,26 +1587,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/9b/69/070eae0d0369562d1dec0046ec2e3dd7c523adfae0f30b3887f81ef98c3b/onnxruntime-1.23.0-cp313-cp313-win_amd64.whl", hash = "sha256:e52c8603c4cc74746ece9966102e4fc6c2b355efc0102a9deb107f3ff86680af", size = 13392787, upload-time = "2025-09-25T19:16:38.871Z" },
     { url = "https://files.pythonhosted.org/packages/42/8c/6f1d8ec63c887a855f65648b1c743f673191da94703b5fd207d21f17c292/onnxruntime-1.23.0-cp313-cp313t-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:24ac2a8b2c6dd00a152a08a9cf1ba3f06b38915f6cb6cf1adbe714e16e5ff460", size = 15148462, upload-time = "2025-09-25T18:56:25.11Z" },
     { url = "https://files.pythonhosted.org/packages/eb/59/0db51308fa479f9325ade08c343a5164153ad01dbb83b62ff661e1129d2e/onnxruntime-1.23.0-cp313-cp313t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:ed85686e08cfb29ee96365b9a49e8a350aff7557c13d63d9f07ca3ad68975074", size = 17281939, upload-time = "2025-09-25T19:16:16.16Z" },
-]
-
-[[package]]
-name = "onnxruntime-gpu"
-version = "1.23.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "coloredlogs" },
-    { name = "flatbuffers" },
-    { name = "numpy" },
-    { name = "packaging" },
-    { name = "protobuf" },
-    { name = "sympy" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/96/e42de1a3a1cb6cb76bb5e98221c59fb8d954ca6929a6aff681d87c9fdca6/onnxruntime_gpu-1.23.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:95801445d4ba4f4420587e66d6ccf28294a9cdc30f542da8425df68ac7101f62", size = 300459379, upload-time = "2025-09-25T18:33:51.181Z" },
-    { url = "https://files.pythonhosted.org/packages/e8/34/1eb9b6ea10045fe20fb2835dcab42472537c9bdbfb390f8a8addaf20a553/onnxruntime_gpu-1.23.0-cp312-cp312-win_amd64.whl", hash = "sha256:17575b3f7b9f4d1867e3fbe6f751669cebfd369b47425ff7fa8813587a5e8c28", size = 285364792, upload-time = "2025-09-25T18:35:29.703Z" },
-    { url = "https://files.pythonhosted.org/packages/8f/da/89c9cc2ffc6eea1135a91e0f60a2ad7ff31c49b4cb3cd37a67e3b1cece25/onnxruntime_gpu-1.23.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:13b0a05475bd35d4b2618dacf565a5a758a77965e7bf5409408084141499f91e", size = 300449251, upload-time = "2025-09-25T18:34:05.74Z" },
-    { url = "https://files.pythonhosted.org/packages/33/6d/bd8a49cf1c8222d47cb1c616d27d94efb00e16de85b59018be7ddd07ea61/onnxruntime_gpu-1.23.0-cp313-cp313-win_amd64.whl", hash = "sha256:3f9b2471b0221275bc0e41b6e2a0f6210bfa5625b293455afc3bf671309ac03a", size = 285365087, upload-time = "2025-09-25T18:35:40.587Z" },
-    { url = "https://files.pythonhosted.org/packages/a6/75/41bc6610d4771cd0dbd438b0b76deee97a680158bef8144e94113a21c941/onnxruntime_gpu-1.23.0-cp313-cp313t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f7cc8136c941019e9e7fe24a28f016d06dd59ca4cf2da2fc04841d78280f0ced", size = 300465591, upload-time = "2025-09-25T18:34:17.853Z" },
 ]
 
 [[package]]

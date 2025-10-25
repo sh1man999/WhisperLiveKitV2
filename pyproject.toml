@@ -12,7 +12,7 @@ dependencies = [
     "uvicorn-worker",
     "python-multipart",
     "logging",
-    "onnxruntime-gpu>=1.22.0",
+    "onnxruntime>=1.22.0",
     "concurrent-log-handler",
     "diart",
     "faster-whisper",

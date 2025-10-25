@@ -1,11 +1,14 @@
 import asyncio
 import logging
 
-from dishka import FromDishka
+from dishka import FromDishka, AsyncContainer, Scope
 from dishka.integrations.fastapi import inject
 from fastapi import APIRouter
 from starlette.websockets import WebSocket, WebSocketDisconnect
+
+from src.backend.entrypoint.config import VacConfig
 from whisperlivekit import AudioProcessor, TranscriptionEngine
+from whisperlivekit.silero_vad_iterator import RealtimeVADIterator
 
 transcribe_router = APIRouter()
 
@@ -25,7 +28,10 @@ async def handle_websocket_results(websocket, results_generator):
 
 @transcribe_router.websocket("/asr")
 @inject
-async def transcribe(websocket: WebSocket, transcription_engine: FromDishka[TranscriptionEngine]):
+async def transcribe(websocket: WebSocket,
+                     transcription_engine: FromDishka[TranscriptionEngine],
+                     vac_config: FromDishka[VacConfig],
+                     container: FromDishka[AsyncContainer]):
     await websocket.accept()
     logger.info("WebSocket-соединение открыто.")
     language = websocket.query_params.get("language", "auto")
@@ -34,10 +40,15 @@ async def transcribe(websocket: WebSocket, transcription_engine: FromDishka[Tran
         await websocket.send_json({"type": "config"})
     except Exception as e:
         logger.warning(f"Не удалось отправить конфигурацию клиенту: {e}")
+
+    vac: RealtimeVADIterator | None = None
+    if vac_config.enable:
+        vac = await container.get(RealtimeVADIterator)
     audio_processor = AudioProcessor(
         transcription_engine=transcription_engine,
         language=language,
-        url=url
+        url=url,
+        vac=vac
     )
     results_generator = await audio_processor.create_tasks()
     websocket_task = asyncio.create_task(

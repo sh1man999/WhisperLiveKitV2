@@ -7,7 +7,7 @@ import logging
 import traceback
 from whisperlivekit.timed_objects import Silence, Line, FrontData, State, Transcript, ChangeSpeaker
 from whisperlivekit.transcription_engine import TranscriptionEngine, online_diarization_factory
-from whisperlivekit.silero_vad_iterator import FixedVADIterator
+from whisperlivekit.silero_vad_iterator import RealtimeVADIterator, VADOnnxWrapper
 from whisperlivekit.results_formater import format_output
 from whisperlivekit.ffmpeg_manager import FFmpegManager, FFmpegState
 from whisperlivekit.whisper_streaming_custom.online_asr import OnlineASRProcessor
@@ -26,7 +26,8 @@ class AudioProcessor:
     def __init__(self,
                  transcription_engine: TranscriptionEngine,
                  language: str = "auto",
-                 url: str|None = None):
+                 url: str|None = None,
+                 vac: RealtimeVADIterator | None = None):
         """Инициализируйте аудиопроцессор с конфигурацией, моделями и состоянием."""
         self.language = language
         self.url = url
@@ -64,10 +65,7 @@ class AudioProcessor:
         
         # Models and processing
         self.asr = transcription_engine.asr
-        if self.args.vac:
-            self.vac_model = transcription_engine.vac_model
-            self.vac = FixedVADIterator(model=transcription_engine.vac_model, min_silence_duration_ms=1000, threshold=0.2) # threshold 0.2 or 0.5? min_silence_duration_ms?, speech_pad_ms 400?
-                         
+        self.vac = vac
         self.ffmpeg_manager = None
         self.ffmpeg_reader_task = None
         self._ffmpeg_error = None
@@ -581,7 +579,7 @@ class AudioProcessor:
         end_of_audio = False
         silence_buffer = None
 
-        if self.args.vac:
+        if self.vac:
             res = self.vac(pcm_array)
 
         if res is not None:
