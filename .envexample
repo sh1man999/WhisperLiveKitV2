@@ -4,6 +4,8 @@ LOG_FILES_PATH=./logs
 AUDIO_STORAGE_PATH=./audio_storage
 AUTH_TOKEN=dfklSAzHdatyuOp
 
+#VAC__MODEL_PATH=./models/silero_vad_16k_op15.onnx
+
 WHISPER__MODELS_PATH=./models
 #WHISPER__MODEL_ID=large-v2
 #WHISPER__CUDA_DEVICE_INDEX=0,1,2,3 # По умолчанию 0
